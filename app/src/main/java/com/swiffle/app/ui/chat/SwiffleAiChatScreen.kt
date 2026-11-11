@@ -15,6 +15,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,9 +44,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.swiffle.app.R
 import com.swiffle.app.ai.SwiffleAiEngine
 import com.swiffle.app.ai.SwiffleAiStreamEvent
 import com.swiffle.app.ai.SwiffleAiTask
@@ -140,12 +147,7 @@ fun SwiffleAiChatScreen(
     }
 
     fun recordTokenUsage(tokenCount: Int) {
-        val currentTokens = sharedPrefs.getInt("tokens_used_today", 0)
-        val currentQueries = sharedPrefs.getInt("queries_executed_today", 0)
-        sharedPrefs.edit()
-            .putInt("tokens_used_today", currentTokens + tokenCount)
-            .putInt("queries_executed_today", currentQueries + 1)
-            .apply()
+        com.swiffle.app.ai.SwiffleAiConfig.recordTokenUsage(context, tokenCount)
     }
 
     fun streamAiResponse(
@@ -496,6 +498,17 @@ fun SwiffleAiChatScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
         ) {
             val isAiGenerating = messages.any { it.isStreaming || it.isThinking }
+            val speechRecognizerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    val matches = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                    val spokenText = matches?.firstOrNull()?.trim()
+                    if (!spokenText.isNullOrBlank()) {
+                        inputQuery = if (inputQuery.isBlank()) spokenText else "$inputQuery $spokenText"
+                    }
+                }
+            }
             FluentChatInputDock(
                 query = inputQuery,
                 isDark = isDark,
@@ -519,7 +532,19 @@ fun SwiffleAiChatScreen(
                     }
                 },
                 onMicClick = {
-                    handleSend("Provide a comprehensive breakdown of the latest developments in artificial intelligence.")
+                    try {
+                        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(
+                                android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                            )
+                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to Swiffle AI...")
+                        }
+                        speechRecognizerLauncher.launch(intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(context, "Voice dictation is not available on this device.", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onUploadFiles = {
                     try {
@@ -591,23 +616,26 @@ private fun FluentChatTitleBar(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // Fluent Copilot Emblem (Iridescent 4-Point Star)
+            // Swiffle AI Emblem (Gemini AI Studio Halo + Small Swiffle SVG)
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF0078D4), Color(0xFF60CDFF), Color(0xFF8764B8))
+                            listOf(
+                                Color(0xFF4285F4).copy(alpha = 0.16f),
+                                Color(0xFF9B72CB).copy(alpha = 0.18f),
+                                Color(0xFFD96570).copy(alpha = 0.14f)
+                            )
                         )
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "✦",
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
+                Image(
+                    painter = painterResource(id = R.drawable.ic_swiffle_logo),
+                    contentDescription = "Swiffle Copilot",
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -762,8 +790,8 @@ private fun FluentUserMessageBubble(
 /**
  * Windows 11 Fluent Assistant Message (Open, Unboxed Presentation):
  * - Direct, elegant typography rendered on the background (NO enclosing card/box).
- * - Fluent Copilot ✦ Starlight Identity & live stream tag.
- * - Live real-time thinking reasoning stream.
+ * - Swiffle SVG Emblem & live stream tag.
+ * - Gemini AI Studio real-time thinking animation with small Swiffle SVG inside.
  * - Clean minimal action bar at bottom.
  */
 @Composable
@@ -782,51 +810,10 @@ private fun FluentAssistantMessageBubble(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp, horizontal = 2.dp)
+            .padding(vertical = 4.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.Start
     ) {
-        // Copilot identity header (Clean, natural, unboxed)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFF0078D4), Color(0xFF60CDFF), Color(0xFF8764B8))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "✦", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = "Swiffle Copilot",
-                fontFamily = GoogleSans,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textPrimary
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Text(
-                text = "Live Stream",
-                fontFamily = GoogleSans,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
-                color = textSecondary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Real Reasoning & Thinking Section
+        // Real Reasoning & Thinking Section (Left-aligned, no AI logo/Swiffle Copilot header)
         if (message.isThinking) {
             FluentCopilotThinkingIndicator(
                 thoughtText = message.thinkingText?.ifBlank { "Thinking..." } ?: "Thinking...",
@@ -898,83 +885,87 @@ private fun FluentAssistantMessageBubble(
 }
 
 /**
- * Brand-New Windows 11 Fluent Copilot Thinking Animation:
- * - Rotating and breathing 4-point Copilot star (✦) with radiant starlight aurora.
- * - Undulating 4-node harmonic energy beam (Cobalt -> Cyan -> Amethyst -> Amber).
- * - Specular iridescent shimmering thought text sweep.
- * - Single-line crisp status without bulky clutter.
+ * Compact Gemini AI Studio Thinking Animation with Small Swiffle SVG Inside:
+ * - Features a continuous 360° rotating monochrome orbital ring with dynamic expanding/contracting
+ *   arc sweep (zero color shifting).
+ * - Centered inside a compact 20.dp orb: the small Swiffle SVG (`R.drawable.ic_swiffle_logo` at 11.dp)
+ *   with a smooth breathing pulse.
+ * - Accompanied by a clean, monochrome luminance shimmer across the status text ("Thinking...").
  */
 @Composable
 fun FluentCopilotThinkingIndicator(
     thoughtText: String = "Thinking...",
     isDark: Boolean = true
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "FluentCopilotThinking")
+    val infiniteTransition = rememberInfiniteTransition(label = "GeminiAiStudioThinking")
 
-    // Harmonic phase wave (1600ms organic wave)
-    val phase by infiniteTransition.animateFloat(
+    // Primary 360° continuous orbital rotation for the monochrome ring
+    val orbitRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 6.283185f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
+            animation = tween(durationMillis = 1400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "FluentHarmonicPhase"
+        label = "GeminiOrbitRotation"
     )
 
-    // Breathing scale for Copilot star
-    val starScale by infiniteTransition.animateFloat(
+    // Dynamic arc sweep expansion/contraction (authentic Google AI Studio spinner feel)
+    val arcSweep by infiniteTransition.animateFloat(
+        initialValue = 75f,
+        targetValue = 265f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "GeminiArcSweep"
+    )
+
+    // Gentle breathing pulse for the inner small Swiffle SVG
+    val logoScale by infiniteTransition.animateFloat(
         initialValue = 0.90f,
-        targetValue = 1.18f,
+        targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "FluentStarScale"
+        label = "SwiffleLogoPulse"
     )
 
-    // Gentle star rotation
-    val starRotation by infiniteTransition.animateFloat(
-        initialValue = -8f,
-        targetValue = 8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "FluentStarRotation"
-    )
-
-    // Specular sweep across thought text
+    // Monochrome luminance shimmer sweep across the "Thinking..." label (no color changing)
     val shimmerTranslate by infiniteTransition.animateFloat(
-        initialValue = -150f,
-        targetValue = 500f,
+        initialValue = -140f,
+        targetValue = 460f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "FluentShimmerText"
+        label = "MonochromeTextShimmer"
     )
+
+    val ringTone = if (isDark) Color(0xFFE4E4E7) else Color(0xFF3F3F46)
+    val ringTrackColor = ringTone.copy(alpha = if (isDark) 0.14f else 0.12f)
+    val monochromeRingColors = remember(isDark) {
+        listOf(
+            ringTone.copy(alpha = 0.08f),
+            ringTone.copy(alpha = 0.45f),
+            ringTone.copy(alpha = 0.92f),
+            ringTone.copy(alpha = 0.08f)
+        )
+    }
+
+    val baseTextColor = if (isDark) Color(0xFF8E8E93) else Color(0xFF71717A)
+    val highlightTextColor = if (isDark) Color(0xFFF4F4F5) else Color(0xFF18181B)
 
     val shimmerBrush = Brush.linearGradient(
         colors = listOf(
-            Color(0xFF0078D4).copy(alpha = 0.65f),
-            if (isDark) Color(0xFFFFFFFF) else Color(0xFF1F1F1F),
-            Color(0xFF60CDFF).copy(alpha = 0.85f),
-            Color(0xFF8764B8).copy(alpha = 0.65f)
+            baseTextColor,
+            highlightTextColor,
+            baseTextColor
         ),
         start = Offset(shimmerTranslate - 120f, 0f),
         end = Offset(shimmerTranslate, 0f)
     )
-
-    // 4 Harmonic Fluent Micro-Nodes: Cobalt, Cyan, Amethyst, Amber
-    val nodeConfigs = remember {
-        listOf(
-            Triple(Color(0xFF0078D4), 0.0f, Color(0xFF0078D4)),
-            Triple(Color(0xFF00C7FD), 1.0f, Color(0xFF00C7FD)),
-            Triple(Color(0xFF8764B8), 2.0f, Color(0xFF8764B8)),
-            Triple(Color(0xFFFF9900), 3.0f, Color(0xFFFF9900))
-        )
-    }
 
     Row(
         modifier = Modifier
@@ -982,65 +973,55 @@ fun FluentCopilotThinkingIndicator(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Rotating & Breathing Copilot Star Emblem
+        // Compact 20.dp Orbital Ring with Small 11.dp Swiffle SVG Inside
         Box(
-            modifier = Modifier
-                .size(22.dp)
-                .graphicsLayer {
-                    scaleX = starScale
-                    scaleY = starScale
-                    rotationZ = starRotation
-                },
+            modifier = Modifier.size(20.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "✦",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF0078D4)
+            // 1. Subtle track + rotating monochrome arc (no color changing)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidthPx = 1.5.dp.toPx()
+                val radius = (size.minDimension - strokeWidthPx) / 2f
+
+                // Subtle background track ring
+                drawCircle(
+                    color = ringTrackColor,
+                    radius = radius,
+                    style = Stroke(width = 1.0.dp.toPx())
+                )
+
+                // Rotating monochrome arc
+                rotate(degrees = orbitRotation) {
+                    drawArc(
+                        brush = Brush.sweepGradient(monochromeRingColors),
+                        startAngle = 0f,
+                        sweepAngle = arcSweep,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                    )
+                }
+            }
+
+            // 2. Small Swiffle SVG centered inside the compact ring
+            Image(
+                painter = painterResource(id = R.drawable.ic_swiffle_logo),
+                contentDescription = "Swiffle AI Thinking",
+                modifier = Modifier
+                    .size(11.dp)
+                    .graphicsLayer {
+                        scaleX = logoScale
+                        scaleY = logoScale
+                    }
             )
         }
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Undulating 4-Node Harmonic Wave
-        Row(
-            modifier = Modifier.height(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            nodeConfigs.forEach { (color, phaseOffset, auraColor) ->
-                val angle = phase + phaseOffset
-                val floatY = kotlin.math.sin(angle) * 3f
-                val scale = 0.82f + 0.32f * ((kotlin.math.sin(angle) + 1f) * 0.5f)
-
-                Box(
-                    modifier = Modifier
-                        .offset(y = floatY.dp)
-                        .size(10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                            .clip(CircleShape)
-                            .background(color)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // Dynamic Thought Label
+        // Monochrome Luminance Shimmering Thought Label (no color changing)
         Text(
             text = if (thoughtText.isNotBlank()) thoughtText else "Thinking...",
             fontFamily = GoogleSans,
-            fontSize = 12.5.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1051,10 +1032,9 @@ fun FluentCopilotThinkingIndicator(
 }
 
 /**
- * Windows 11 Fluent Reasoning Expander:
- * - Displays "Thought for ${duration}s" with rotating chevron.
- * - Expands to reveal deep step-by-step reasoning transcript.
- * - Left vertical rule in Fluent Cobalt Blue.
+ * Clean Left-Aligned Reasoning Expander:
+ * - Strictly left-aligned "Thought for ${duration}s" with rotating chevron (no AI logo, no "Reasoning Complete" pill).
+ * - Expands to reveal step-by-step reasoning transcript.
  */
 @Composable
 private fun FluentReasoningExpander(
@@ -1064,9 +1044,6 @@ private fun FluentReasoningExpander(
     onToggle: () -> Unit,
     isDark: Boolean
 ) {
-    val cardBg = if (isDark) Color(0xFF242424) else Color(0xFFF9F9F9)
-    val cardBorder = if (isDark) Color(0xFF383838) else Color(0xFFE5E5E5)
-    val textPrimary = if (isDark) Color(0xFFFFFFFF) else Color(0xFF1F1F1F)
     val textSecondary = if (isDark) Color(0xFFA0A0A0) else Color(0xFF5D5D5D)
 
     val chevronRotation by animateFloatAsState(
@@ -1075,94 +1052,65 @@ private fun FluentReasoningExpander(
         label = "FluentChevronRotation"
     )
 
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = cardBg,
-        border = BorderStroke(1.dp, cardBorder),
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp),
+        horizontalAlignment = Alignment.Start
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable { onToggle() }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Text(
+                text = "Thought for ${durationSec}s",
+                fontFamily = GoogleSans,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = textSecondary
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = textSecondary,
+                modifier = Modifier
+                    .size(16.dp)
+                    .rotate(chevronRotation)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(animationSpec = tween(FluentNormalDuration, easing = FluentDecelerate)) + fadeIn(),
+            exit = shrinkVertically(animationSpec = tween(FluentFastDuration, easing = FluentAccelerate)) + fadeOut()
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onToggle() }
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 2.dp, top = 4.dp, bottom = 6.dp)
             ) {
-                Text(
-                    text = "✦",
-                    color = Color(0xFF0078D4),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                // Left vertical accent guide
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .defaultMinSize(minHeight = 20.dp)
+                        .background(Color(0xFF9B72CB).copy(alpha = 0.55f))
                 )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Thought for ${durationSec}s",
+                    text = thinkingText,
                     fontFamily = GoogleSans,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textPrimary
+                    lineHeight = 17.sp,
+                    color = textSecondary
                 )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (isDark) Color(0xFF107C41).copy(alpha = 0.2f) else Color(0xFFDFF6DD),
-                    border = BorderStroke(0.6.dp, Color(0xFF107C41).copy(alpha = 0.4f))
-                ) {
-                    Text(
-                        text = "Reasoning Complete",
-                        fontFamily = GoogleSans,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF107C41),
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = textSecondary,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .rotate(chevronRotation)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(animationSpec = tween(FluentNormalDuration, easing = FluentDecelerate)) + fadeIn(),
-                exit = shrinkVertically(animationSpec = tween(FluentFastDuration, easing = FluentAccelerate)) + fadeOut()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    // Left vertical accent guide
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .height(IntrinsicSize.Min)
-                            .background(Color(0xFF0078D4))
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = thinkingText,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        color = textSecondary
-                    )
-                }
             }
         }
     }
@@ -1170,7 +1118,7 @@ private fun FluentReasoningExpander(
 
 /**
  * Windows 11 Fluent Hero View (Empty State):
- * - Large Copilot emblem with multi-tone gradient aura.
+ * - Large Swiffle SVG emblem with Gemini multi-tone gradient aura.
  * - Title & Subtitle Segoe ramp.
  * - 4 WinUI 3 styled Prompt Cards with 8dp rounded corners & hover lift.
  */
@@ -1193,9 +1141,9 @@ private fun FluentChatHeroView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Large Copilot Emblem
+        // Large Swiffle SVG Emblem inside Gemini Aurora Container
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             color = if (isDark) Color(0xFF2B2B2B) else Color(0xFFFFFFFF),
             border = BorderStroke(1.dp, cardBorder),
             shadowElevation = 3.dp,
@@ -1208,17 +1156,17 @@ private fun FluentChatHeroView(
                     .background(
                         Brush.linearGradient(
                             listOf(
-                                Color(0xFF0078D4).copy(alpha = 0.15f),
-                                Color(0xFF8764B8).copy(alpha = 0.15f)
+                                Color(0xFF4285F4).copy(alpha = 0.16f),
+                                Color(0xFF9B72CB).copy(alpha = 0.16f),
+                                Color(0xFFD96570).copy(alpha = 0.12f)
                             )
                         )
                     )
             ) {
-                Text(
-                    text = "✦",
-                    fontSize = 32.sp,
-                    color = Color(0xFF0078D4),
-                    fontWeight = FontWeight.Bold
+                Image(
+                    painter = painterResource(id = R.drawable.ic_swiffle_logo),
+                    contentDescription = "Swiffle Copilot",
+                    modifier = Modifier.size(38.dp)
                 )
             }
         }

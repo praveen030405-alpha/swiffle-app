@@ -82,6 +82,7 @@ import java.io.File
 @Composable
 fun SwifflePdfEditScreen(
     pdfUri: Uri,
+    initialPageIndex: Int = 0,
     onBack: () -> Unit,
     onSaved: (File) -> Unit = {},
     viewModel: PdfEditViewModel = viewModel()
@@ -89,7 +90,7 @@ fun SwifflePdfEditScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    var currentPageIndex by remember { mutableIntStateOf(0) }
+    var currentPageIndex by remember(initialPageIndex) { mutableIntStateOf(initialPageIndex.coerceAtLeast(0)) }
     var totalPages by remember { mutableIntStateOf(1) }
     var pageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pdfRenderer by remember { mutableStateOf<PdfRenderer?>(null) }

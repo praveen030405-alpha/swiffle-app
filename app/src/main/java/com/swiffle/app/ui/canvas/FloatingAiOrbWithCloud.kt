@@ -73,7 +73,7 @@ fun FloatingAiOrbWithCloud(
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    val orbSizeDp = 56.dp
+    val orbSizeDp = 46.dp
     val orbSizePx = with(density) { orbSizeDp.toPx() }
 
     // Initial position: Bottom right above the dock
@@ -345,31 +345,15 @@ fun FloatingAiOrbWithCloud(
                     }
                 }
         ) {
-            // Luminous ambient glow when thinking
-            if (isThinking) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(Color(0xFF9B72CB).copy(alpha = 0.45f), Color.Transparent)
-                            )
-                        )
-                )
-            }
-
-            // Elevated Circular Surface with Swiffle App Logo
+            // Elevated Circular Surface with Swiffle App Logo (compact & neutral, no color shift)
             Surface(
                 shape = CircleShape,
-                color = if (isDark) Color(0xFF221F2D) else Color(0xFFFFFFFF),
+                color = if (isDark) Color(0xFF202024) else Color(0xFFFFFFFF),
                 tonalElevation = 6.dp,
                 shadowElevation = 8.dp,
                 border = BorderStroke(
-                    width = 1.5.dp,
-                    brush = Brush.linearGradient(
-                        listOf(Color(0xFF9B72CB), Color(0xFF4285F4))
-                    )
+                    width = 1.dp,
+                    color = if (isDark) Color(0x33FFFFFF) else Color(0x1F000000)
                 ),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -377,7 +361,7 @@ fun FloatingAiOrbWithCloud(
                     Image(
                         painter = painterResource(id = R.drawable.ic_swiffle_logo),
                         contentDescription = "Swiffle AI Mode",
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

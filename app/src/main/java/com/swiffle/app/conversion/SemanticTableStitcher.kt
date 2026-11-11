@@ -1,34 +1,28 @@
 package com.swiffle.app.conversion
 
 import java.util.regex.Pattern
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * Semantic Multi-Page Table Stitcher.
- * 
- * Replaces page-by-page dumping with holistic document understanding:
- *  1. Segregates metadata/headers from the tabular matrix.
- *  2. Fuses multi-line column headers (e.g., "Scope" + "Qty" -> "Scope Qty").
- *  3. Computes TableColumnSignature per page.
- *  4. Stitches matching continuation pages into a single continuous master table.
- *  5. Automatically de-duplicates repeated headers across page breaks.
+ *
+ * General-purpose multi-page table assembly without document-specific hardcoded strings:
+ *  1. Segregates single-span document titles/banners above the table from the multi-column header & body.
+ *  2. Fuses multi-line column headers (e.g., stacked header bands) into clean column titles.
+ *  3. Computes TableColumnSignature per page and stitches continuation pages seamlessly.
+ *  4. Automatically de-duplicates repeated header rows across page breaks.
+ *  5. Prunes completely empty columns so exported Excel workbooks are compact and aligned.
  */
 object SemanticTableStitcher {
 
-    private val ITEM_SEQUENCE_PATTERN = Pattern.compile("^\\d+(\\.\\d+)+$")
+    private val ITEM_SEQUENCE_PATTERN = Pattern.compile("^\\d+(\\.\\d+)*[.)]?$")
 
-    /**
-     * Stitches per-page reconstructed grids into cohesive semantic tables.
-     */
     fun stitchTables(
         pageGrids: List<ReconstructedTableGrid>
     ): List<SemanticDocumentTable> {
         if (pageGrids.isEmpty()) return emptyList()
 
         val stitchedTables = mutableListOf<SemanticDocumentTable>()
-        var currentTableTitle = "Table"
+        var currentTableTitle = "Sheet 1"
         var currentMetadata = mutableListOf<String>()
         var currentHeaders = mutableListOf<String>()
         var currentRows = mutableListOf<List<SemanticCell>>()
@@ -38,13 +32,9 @@ object SemanticTableStitcher {
         for (grid in pageGrids) {
             if (grid.rows.isEmpty()) continue
 
-            // 1. Separate Top Page Metadata from the Table Body
-            val (pageMetadata, headerRowCandidate, dataRows) = partitionPageRows(grid)
+            val (pageMetadata, headerRowCandidates, dataRows) = partitionPageRows(grid)
+            val synthesizedHeader = synthesizeHeader(headerRowCandidates, grid.columns)
 
-            // 2. Synthesize multi-line header for this page
-            val synthesizedHeader = synthesizeHeader(headerRowCandidate, grid.columns)
-
-            // 3. Extract Column Signature for continuity matching
             val pageSignature = TableColumnSignature(
                 columnCount = grid.columns.size,
                 columnBounds = grid.columns,
@@ -54,13 +44,11 @@ object SemanticTableStitcher {
             val isContinuation = currentSignature != null && currentSignature.isContinuationOf(pageSignature)
 
             if (isContinuation && currentHeaders.isNotEmpty()) {
-                // Continuation of the current table!
                 currentPages.add(grid.pageIndex)
 
-                // Append data rows, converting LatticeCell to SemanticCell and de-duplicating any repeated header
                 for (latticeRow in dataRows) {
                     if (isHeaderDuplicate(latticeRow, currentHeaders)) {
-                        continue // Skip repeated header row on continuation page
+                        continue
                     }
                     val rowCells = convertRowCells(latticeRow, currentHeaders.size)
                     if (rowCells.any { it.text.isNotBlank() }) {
@@ -68,21 +56,21 @@ object SemanticTableStitcher {
                     }
                 }
             } else {
-                // Finalize previous table if it exists
                 if (currentRows.isNotEmpty() || currentHeaders.isNotEmpty()) {
                     stitchedTables.add(
-                        SemanticDocumentTable(
-                            title = currentTableTitle,
-                            metadataHeader = currentMetadata.toList(),
-                            columnHeaders = currentHeaders.toList(),
-                            rows = currentRows.toList(),
-                            sourcePageIndices = currentPages.toList()
+                        pruneEmptyColumns(
+                            SemanticDocumentTable(
+                                title = currentTableTitle,
+                                metadataHeader = currentMetadata.toList(),
+                                columnHeaders = currentHeaders.toList(),
+                                rows = currentRows.toList(),
+                                sourcePageIndices = currentPages.toList()
+                            )
                         )
                     )
                 }
 
-                // Start new semantic table
-                currentTableTitle = determineTableTitle(pageMetadata, grid.pageIndex)
+                currentTableTitle = determineTableTitle(pageMetadata, stitchedTables.size)
                 currentMetadata = pageMetadata.toMutableList()
                 currentHeaders = synthesizedHeader.toMutableList()
                 currentRows = mutableListOf()
@@ -98,15 +86,16 @@ object SemanticTableStitcher {
             }
         }
 
-        // Finalize last table
         if (currentRows.isNotEmpty() || currentHeaders.isNotEmpty()) {
             stitchedTables.add(
-                SemanticDocumentTable(
-                    title = currentTableTitle,
-                    metadataHeader = currentMetadata.toList(),
-                    columnHeaders = currentHeaders.toList(),
-                    rows = currentRows.toList(),
-                    sourcePageIndices = currentPages.toList()
+                pruneEmptyColumns(
+                    SemanticDocumentTable(
+                        title = currentTableTitle,
+                        metadataHeader = currentMetadata.toList(),
+                        columnHeaders = currentHeaders.toList(),
+                        rows = currentRows.toList(),
+                        sourcePageIndices = currentPages.toList()
+                    )
                 )
             )
         }
@@ -115,7 +104,35 @@ object SemanticTableStitcher {
     }
 
     /**
-     * Partitions rows into Metadata (top title, company name), Header Candidate(s), and Body Data Rows.
+     * Removes columns that have no data cells and only a generic "Column N" header.
+     */
+    private fun pruneEmptyColumns(table: SemanticDocumentTable): SemanticDocumentTable {
+        val colCount = table.columnHeaders.size
+        if (colCount <= 1 || table.rows.isEmpty()) return table
+
+        val activeColIndices = (0 until colCount).filter { cIdx ->
+            val header = table.columnHeaders.getOrNull(cIdx).orEmpty()
+            val hasCustomHeader = header.isNotBlank() && !header.matches(Regex("^Column \\d+$", RegexOption.IGNORE_CASE))
+            val hasAnyCellData = table.rows.any { row -> row.getOrNull(cIdx)?.text?.isNotBlank() == true }
+            hasCustomHeader || hasAnyCellData
+        }
+
+        if (activeColIndices.isEmpty() || activeColIndices.size == colCount) return table
+
+        val prunedHeaders = activeColIndices.map { table.columnHeaders[it] }
+        val prunedRows = table.rows.map { row ->
+            activeColIndices.map { cIdx -> row.getOrNull(cIdx) ?: SemanticCell("") }
+        }
+
+        return table.copy(
+            columnHeaders = prunedHeaders,
+            rows = prunedRows
+        )
+    }
+
+    /**
+     * Partitions rows into top metadata banners, column header row(s), and tabular data rows
+     * using structural cell counts and data-type distribution.
      */
     private fun partitionPageRows(
         grid: ReconstructedTableGrid
@@ -124,22 +141,31 @@ object SemanticTableStitcher {
         val headerRows = mutableListOf<LatticeRow>()
         val dataRows = mutableListOf<LatticeRow>()
 
+        val totalCols = grid.columns.size
+        val maxCellsInAnyRow = grid.rows.maxOfOrNull { it.cells.size } ?: 1
         var foundHeader = false
 
-        for (row in grid.rows) {
+        for ((rIdx, row) in grid.rows.withIndex()) {
             val fullText = row.cells.joinToString(" ") { it.rawText }.trim()
+            if (fullText.isBlank()) continue
 
-            // Detect company title, banner or top metadata
-            if (!foundHeader && isMetadataRow(row, grid.columns.size)) {
+            // Top single-span title/banner before the multi-column grid starts
+            val isLeadingSingleSpan = !foundHeader &&
+                    headerRows.isEmpty() &&
+                    rIdx < 4 &&
+                    row.cells.size == 1 &&
+                    maxCellsInAnyRow >= 2 &&
+                    totalCols >= 2
+
+            if (isLeadingSingleSpan) {
                 metadata.add(fullText)
                 continue
             }
 
-            // Check if this row is part of the header band (usually first 1-3 rows with text only)
-            if (!foundHeader && (row.isHeaderCandidate || isHeaderLikeRow(row))) {
+            if (!foundHeader && headerRows.size < 2 && isHeaderLikeRow(row, headerRows.isEmpty())) {
                 headerRows.add(row)
-                // If the next rows also look like header text fragments (e.g. "Qty", "No."), keep accumulating
-                if (headerRows.size >= 3) {
+                // If this row already populates most columns, one header row is usually sufficient unless next row is short sub-headers
+                if (row.cells.size >= (maxCellsInAnyRow * 0.75f).toInt().coerceAtLeast(2)) {
                     foundHeader = true
                 }
             } else {
@@ -148,24 +174,13 @@ object SemanticTableStitcher {
             }
         }
 
-        // If page 0 has no explicit header candidate, take the first row if it looks like a header
-        if (headerRows.isEmpty() && dataRows.isNotEmpty() && grid.pageIndex == 0) {
-            val first = dataRows.first()
-            if (isHeaderLikeRow(first)) {
-                headerRows.add(dataRows.removeAt(0))
-            }
+        if (headerRows.isEmpty() && dataRows.isNotEmpty()) {
+            headerRows.add(dataRows.removeAt(0))
         }
 
         return Triple(metadata, headerRows, dataRows)
     }
 
-    /**
-     * Synthesizes multi-line header rows into a single cohesive column header list.
-     * E.g.
-     *  Row 0: ["Scope", "Tender", "Done"]
-     *  Row 1: ["Qty",   "Qty",    "Qty"]
-     *  -> ["Scope Qty", "Tender Qty", "Done Qty"]
-     */
     fun synthesizeHeader(
         headerRows: List<LatticeRow>,
         columns: List<LatticeColumn>
@@ -189,60 +204,58 @@ object SemanticTableStitcher {
             if (tokens.isEmpty()) {
                 "Column ${idx + 1}"
             } else {
-                // Join vertically stacked tokens and remove duplicate repeated words
-                val combined = tokens.joinToString(" ").replace("\\s+".toRegex(), " ").trim()
-                combined.ifBlank { "Column ${idx + 1}" }
+                tokens.joinToString(" ").replace(Regex("\\s+"), " ").trim().ifBlank { "Column ${idx + 1}" }
             }
         }
     }
 
-    /**
-     * Determines if a row is a page-top metadata banner (company name, address, report subtitle)
-     * rather than an actual tabular column header.
-     */
-    private fun isMetadataRow(row: LatticeRow, totalColumns: Int): Boolean {
-        val text = row.cells.joinToString(" ") { it.rawText }.lowercase()
-        val isExplicitMeta = text.contains("name of company") ||
-                text.contains("bill of quantity") ||
-                text.contains("survey no") ||
-                text.contains("report") ||
-                text.contains("meeting") ||
-                text.contains("balance sheet") ||
-                text.contains("pursuant to section")
-
-        // If row spans only 1 wide cell across a multi-column table
-        val isSingleSpan = row.cells.size <= 2 && totalColumns >= 4
-        return isExplicitMeta && isSingleSpan
-    }
-
-    private fun isHeaderLikeRow(row: LatticeRow): Boolean {
-        // If the first cell is an item sequence number like 1.2 or 1.24.1, it's a data row
-        val firstCellText = row.cells.firstOrNull()?.rawText?.trim() ?: ""
-        if (ITEM_SEQUENCE_PATTERN.matcher(firstCellText).matches()) {
-            return false
+    private fun isHeaderLikeRow(row: LatticeRow, isFirstCandidate: Boolean): Boolean {
+        val firstCellText = row.cells.firstOrNull()?.rawText?.trim().orEmpty()
+        if (ITEM_SEQUENCE_PATTERN.matcher(firstCellText).matches() && row.cells.size >= 2) {
+            // Check if the rest of the row has numbers (which makes it a numbered data row like "1 | Widget | $10.00")
+            val hasNumbers = row.cells.drop(1).any {
+                it.dataType == CellDataType.NUMERIC ||
+                it.dataType == CellDataType.CURRENCY ||
+                it.dataType == CellDataType.PERCENTAGE
+            }
+            if (hasNumbers) return false
         }
-        // Headers predominantly contain text, with zero or minimal numeric values
+
         val textCount = row.cells.count { it.dataType == CellDataType.TEXT }
-        val numCount = row.cells.count { it.dataType == CellDataType.NUMERIC || it.dataType == CellDataType.CURRENCY }
-        return textCount > 0 && numCount == 0
+        val numCount = row.cells.count {
+            it.dataType == CellDataType.NUMERIC ||
+            it.dataType == CellDataType.CURRENCY ||
+            it.dataType == CellDataType.PERCENTAGE
+        }
+        return if (isFirstCandidate) {
+            textCount >= numCount && textCount > 0
+        } else {
+            textCount > 0 && numCount == 0
+        }
     }
 
     private fun isHeaderDuplicate(row: LatticeRow, existingHeaders: List<String>): Boolean {
         val rowTexts = row.cells.map { it.rawText.trim().lowercase() }.filter { it.isNotBlank() }
         if (rowTexts.isEmpty()) return false
         val headerTexts = existingHeaders.map { it.trim().lowercase() }
-        val matches = rowTexts.count { rt -> headerTexts.any { ht -> ht.contains(rt) || rt.contains(ht) } }
-        return matches >= (rowTexts.size * 0.6f)
+        val matches = rowTexts.count { rt -> headerTexts.any { ht -> ht == rt || ht.contains(rt) || rt.contains(ht) } }
+        return matches >= (rowTexts.size * 0.65f)
     }
 
     private fun convertRowCells(latticeRow: LatticeRow, targetColCount: Int): List<SemanticCell> {
         val result = MutableList(targetColCount) { SemanticCell(text = "") }
         for (cell in latticeRow.cells) {
             if (cell.columnIndex in 0 until targetColCount) {
+                val existing = result[cell.columnIndex]
+                val combinedText = if (existing.text.isBlank()) {
+                    cell.rawText
+                } else {
+                    "${existing.text} ${cell.rawText}".trim()
+                }
                 result[cell.columnIndex] = SemanticCell(
-                    text = cell.rawText,
-                    dataType = cell.dataType,
-                    numericValue = cell.numericValue,
+                    text = combinedText,
+                    dataType = if (existing.text.isBlank()) cell.dataType else CellDataType.TEXT,
+                    numericValue = if (existing.text.isBlank()) cell.numericValue else null,
                     currencySymbol = cell.currencySymbol,
                     isHeader = false
                 )
@@ -251,24 +264,18 @@ object SemanticTableStitcher {
         return result
     }
 
-    private fun determineTableTitle(metadata: List<String>, pageIndex: Int): String {
-        for (line in metadata) {
-            val lower = line.lowercase()
-            when {
-                lower.contains("bill of quantity") -> return "Bill of Quantity"
-                lower.contains("board meeting") -> return "Board Meeting"
-                lower.contains("extract of board's report") -> return "Board Report"
-                lower.contains("balance sheet") -> return "Balance Sheet"
-                lower.contains("profit and loss") || lower.contains("p&l") -> return "Profit & Loss"
-                lower.contains("audit") -> return "Auditor Report"
-                lower.contains("attendance") -> return "Attendance"
-                lower.contains("tender") -> return "Tender Schedule"
+    private fun determineTableTitle(metadata: List<String>, tableIndex: Int): String {
+        val firstMeta = metadata.firstOrNull { it.isNotBlank() }?.trim()
+        if (!firstMeta.isNullOrBlank()) {
+            val cleaned = firstMeta.replace(Regex("[\\\\/*?:\\[\\]]"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            if (cleaned.length in 3..28) {
+                return cleaned
+            } else if (cleaned.length > 28) {
+                return cleaned.take(26).trim()
             }
         }
-        return if (metadata.isNotEmpty()) {
-            metadata.first().take(25).trim()
-        } else {
-            "Table ${pageIndex + 1}"
-        }
+        return "Table ${tableIndex + 1}"
     }
 }

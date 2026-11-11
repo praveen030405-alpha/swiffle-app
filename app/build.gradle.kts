@@ -45,6 +45,9 @@ android {
             excludes += "mozilla/public-suffix-list.txt"
         }
     }
+    androidResources {
+        noCompress += "tflite"
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -103,10 +106,11 @@ dependencies {
     // DataStore — persist recent files, user settings
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // ML Kit — Document Scanner & OCR
+    // ML Kit — Document Scanner & OCR + TensorFlow Lite for Gemma 2 Embeddings
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
     implementation("com.google.mlkit:text-recognition:16.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
 
     // Android Credential Manager & Google Identity Services (GIS)
     implementation("androidx.credentials:credentials:1.3.0")

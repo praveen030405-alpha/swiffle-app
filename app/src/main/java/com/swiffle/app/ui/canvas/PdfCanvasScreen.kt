@@ -2051,8 +2051,9 @@ fun PdfCanvasScreen(
     
 
     val initScope = rememberCoroutineScope()
+    var pdfReloadGeneration by remember { mutableIntStateOf(0) }
 
-    DisposableEffect(pdfUri) {
+    DisposableEffect(pdfUri, pdfReloadGeneration) {
 
         var isDisposed = false
 
@@ -7445,14 +7446,39 @@ fun PdfCanvasScreen(
             )
         }
 
-        // Project Chameleon: Next-Gen Lossless PDF Editor
+        // Project Chameleon: AST + PaddleOCR Lossless PDF Editor
         if (isEditModeActive) {
             Box(modifier = Modifier.fillMaxSize().zIndex(50f)) {
                 com.swiffle.app.pdfedit.ui.canvas.SwifflePdfEditScreen(
                     pdfUri = pdfUri,
+                    initialPageIndex = (currentPage - 1).coerceAtLeast(0),
                     onBack = { isEditModeActive = false },
                     onSaved = { savedFile ->
-                        isEditModeActive = false
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val cacheDocName = "swiffle_doc_${pdfUri.hashCode().toUInt()}.pdf"
+                                val cachedFile = java.io.File(context.cacheDir, cacheDocName)
+                                val vaultDir = java.io.File(context.filesDir, "recent_vault").apply { mkdirs() }
+                                val vaultFile = java.io.File(vaultDir, "vault_${pdfUri.hashCode().toUInt()}.pdf")
+                                savedFile.copyTo(cachedFile, overwrite = true)
+                                savedFile.copyTo(vaultFile, overwrite = true)
+                                try {
+                                    context.contentResolver.openOutputStream(pdfUri, "wt")?.use { out ->
+                                        savedFile.inputStream().use { it.copyTo(out) }
+                                    }
+                                } catch (_: Exception) {}
+                            } catch (_: Exception) {}
+                            withContext(Dispatchers.Main) {
+                                PdfPreloader.clearAllCache()
+                                PageGeometryCache.clear()
+                                pageBitmaps.clear()
+                                thumbBitmaps.clear()
+                                focalTiles.clear()
+                                currentFocalTile = null
+                                pdfReloadGeneration++
+                                isEditModeActive = false
+                            }
+                        }
                     }
                 )
             }

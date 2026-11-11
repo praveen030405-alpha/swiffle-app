@@ -227,12 +227,7 @@ fun AskSwiffleBottomSheet(
 
     // Record token usage into settings persistence
     fun recordTokenUsage(tokenCount: Int) {
-        val currentTokens = sharedPrefs.getInt("tokens_used_today", 0)
-        val currentQueries = sharedPrefs.getInt("queries_executed_today", 0)
-        sharedPrefs.edit()
-            .putInt("tokens_used_today", currentTokens + tokenCount)
-            .putInt("queries_executed_today", currentQueries + 1)
-            .apply()
+        com.swiffle.app.ai.SwiffleAiConfig.recordTokenUsage(context, tokenCount)
     }
 
     // Helper to simulate token stream
@@ -728,6 +723,34 @@ fun AskSwiffleBottomSheet(
                     .background(Color.Transparent)
             ) {
                 val isAiGenerating = messages.any { it.isStreaming || it.isThinking }
+                val speechLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == android.app.Activity.RESULT_OK) {
+                        val spoken = result.data
+                            ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                            ?.firstOrNull()
+                            ?.trim()
+                        if (!spoken.isNullOrBlank()) {
+                            inputQuery = if (inputQuery.isBlank()) spoken else "$inputQuery $spoken"
+                        }
+                    }
+                }
+                val docPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri != null) {
+                        val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "Document"
+                        handleSend("Analyze the attached document ($fileName) alongside the current page and synthesize key findings.")
+                    }
+                }
+                val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                ) { uri ->
+                    if (uri != null) {
+                        handleSend("Inspect the selected image alongside the current document page and summarize key visual observations.")
+                    }
+                }
                 SlimChatInputBar(
                     query = inputQuery,
                     isDark = isDark,
@@ -743,20 +766,37 @@ fun AskSwiffleBottomSheet(
                         }
                     },
                     onMicClick = {
-                        if (selectedText.isNotBlank()) {
-                            handleSend("Analyze \"${selectedText.take(40)}\" and break down its significance.")
-                        } else {
-                            handleSend("Summarize the key insights and data on this page.")
+                        try {
+                            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(
+                                    android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                )
+                                putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Ask Swiffle about this document...")
+                            }
+                            speechLauncher.launch(intent)
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Voice dictation is not available on this device.",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
                     onUploadFiles = {
-                        handleSend("Analyze uploaded document files and synthesize key findings into a structured comparison matrix.")
+                        try {
+                            docPickerLauncher.launch(arrayOf("application/pdf", "text/*", "*/*"))
+                        } catch (_: Exception) {}
                     },
                     onPhotos = {
-                        handleSend("Inspect active document photo visual elements and summarize observations.")
+                        try {
+                            imagePickerLauncher.launch("image/*")
+                        } catch (_: Exception) {}
                     },
                     onCamera = {
-                        handleSend("Analyze camera capture of this page and extract all text and tabular data.")
+                        try {
+                            imagePickerLauncher.launch("image/*")
+                        } catch (_: Exception) {}
                     }
                 )
             }
@@ -1159,17 +1199,18 @@ internal fun CollapsibleThinkingAccordion(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp)
+                .padding(vertical = 2.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            // Completed Reasoning: Clean borderless clickable toggle
+            // Completed Reasoning: Clean borderless left-aligned clickable toggle
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
                     .clickable { onToggle() }
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
             ) {
-
                 Text(
                     text = "Thought for ${duration}s",
                     fontFamily = GoogleSans,

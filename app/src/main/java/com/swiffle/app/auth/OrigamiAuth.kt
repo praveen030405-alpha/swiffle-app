@@ -323,16 +323,13 @@ object OrigamiAuth {
                             e.message?.contains("unable to resolve host", ignoreCase = true) == true ||
                             e.message?.contains("failed to connect", ignoreCase = true) == true ||
                             e.message?.contains("Standby", ignoreCase = true) == true
-            if (isNetwork && email.contains("@") && pass.length >= 6) {
-                Log.w(TAG, "Supabase network unreachable, falling back to local session for $email")
-                val displayName = email.substringBefore("@").replaceFirstChar { it.uppercase() }
-                _authState.value = AuthState.Authenticated(email = email, displayName = displayName, avatarUrl = null)
-                Result.success(email)
+            val msg = if (isNetwork) {
+                "Network unreachable. Please check your internet connection or continue in Guest Mode."
             } else {
-                val msg = if (isNetwork) "Offline login: password must be at least 6 characters" else (e.localizedMessage ?: "Invalid email or password")
-                _authState.value = AuthState.Error(msg)
-                Result.failure(e)
+                e.localizedMessage ?: "Invalid email or password"
             }
+            _authState.value = AuthState.Error(msg)
+            Result.failure(Exception(msg, e))
         }
     }
 
@@ -354,16 +351,13 @@ object OrigamiAuth {
                             e.message?.contains("unable to resolve host", ignoreCase = true) == true ||
                             e.message?.contains("failed to connect", ignoreCase = true) == true ||
                             e.message?.contains("Standby", ignoreCase = true) == true
-            if (isNetwork && email.contains("@") && pass.length >= 6) {
-                Log.w(TAG, "Supabase network unreachable, registering local session for $email")
-                val displayName = email.substringBefore("@").replaceFirstChar { it.uppercase() }
-                _authState.value = AuthState.Authenticated(email = email, displayName = displayName, avatarUrl = null)
-                Result.success(email)
+            val msg = if (isNetwork) {
+                "Network unreachable. Please check your internet connection or continue in Guest Mode."
             } else {
-                val msg = if (isNetwork) "Offline signup: password must be at least 6 characters" else (e.localizedMessage ?: "Registration failed")
-                _authState.value = AuthState.Error(msg)
-                Result.failure(e)
+                e.localizedMessage ?: "Registration failed"
             }
+            _authState.value = AuthState.Error(msg)
+            Result.failure(Exception(msg, e))
         }
     }
 

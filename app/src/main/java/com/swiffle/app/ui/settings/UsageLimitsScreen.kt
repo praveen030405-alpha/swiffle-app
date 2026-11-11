@@ -80,10 +80,10 @@ fun UsageLimitsSubpage(
     var showTooltip by remember { mutableStateOf(false) }
     var isLoadingResets by remember { mutableStateOf(true) }
 
-    // Live Token & Quota Metrics from Swiffle AI
+    // Live Token & Quota Metrics from Swiffle AI (real counters, zero fake defaults)
     val usagePrefs = remember { context.getSharedPreferences("swiffle_usage_prefs", Context.MODE_PRIVATE) }
-    var tokensToday by remember { mutableIntStateOf(usagePrefs.getInt("tokens_used_today", 14850)) }
-    var queriesToday by remember { mutableIntStateOf(usagePrefs.getInt("queries_executed_today", 19)) }
+    var tokensToday by remember { mutableIntStateOf(usagePrefs.getInt("real_tokens_used_today", 0)) }
+    var queriesToday by remember { mutableIntStateOf(usagePrefs.getInt("real_queries_executed_today", 0)) }
     val dailyQuota = 100000 // 100k daily tier token allocation
 
     // Real-time remaining percentage
@@ -94,11 +94,11 @@ fun UsageLimitsSubpage(
         label = "usage_progress_anim"
     )
 
-    // Simulate initial check for usage limit resets with smooth transition
+    // Load real usage telemetry
     LaunchedEffect(Unit) {
-        delay(600)
-        tokensToday = usagePrefs.getInt("tokens_used_today", 14850)
-        queriesToday = usagePrefs.getInt("queries_executed_today", 19)
+        delay(250)
+        tokensToday = usagePrefs.getInt("real_tokens_used_today", 0)
+        queriesToday = usagePrefs.getInt("real_queries_executed_today", 0)
         isLoadingResets = false
     }
 
@@ -268,7 +268,7 @@ fun UsageLimitsSubpage(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Resets November 2",
+                            text = "Resets daily at midnight local time",
                             fontFamily = GoogleSans,
                             fontWeight = FontWeight.Normal,
                             fontSize = 13.sp,
@@ -289,7 +289,7 @@ fun UsageLimitsSubpage(
                         }
                     }
 
-                    // Informational Tooltip Popover (Matching Reference Frame 00:05)
+                    // Informational Tooltip Popover
                     AnimatedVisibility(
                         visible = showTooltip,
                         enter = fadeIn(tween(200)) + expandVertically(tween(220, easing = SwiffleMotion.EmphasizedDecelerate)),
@@ -307,7 +307,7 @@ fun UsageLimitsSubpage(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Usage limit resets restore your Swiffle usage limits and can each be used once.",
+                                    text = "Usage telemetry tracks real tokens and queries executed across Groq, OpenRouter, and RAG sessions.",
                                     fontFamily = GoogleSans,
                                     fontSize = 12.5.sp,
                                     lineHeight = 17.sp,
@@ -397,15 +397,46 @@ fun UsageLimitsSubpage(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 20.dp),
+                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "No usage limit resets available at this time.",
-                                fontFamily = GoogleSans,
-                                fontSize = 14.5.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Local Session Telemetry",
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Reset today's local token and query counters.",
+                                    fontFamily = GoogleSans,
+                                    fontSize = 12.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    usagePrefs.edit()
+                                        .putInt("real_tokens_used_today", 0)
+                                        .putInt("real_queries_executed_today", 0)
+                                        .putInt("tokens_used_today", 0)
+                                        .putInt("queries_executed_today", 0)
+                                        .apply()
+                                    tokensToday = 0
+                                    queriesToday = 0
+                                    Toast.makeText(context, "Daily usage telemetry reset to 0", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Text(
+                                    text = "Reset",
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp,
+                                    color = Color(0xFF0078D4)
+                                )
+                            }
                         }
                     }
                 }

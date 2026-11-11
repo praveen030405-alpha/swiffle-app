@@ -235,18 +235,9 @@ fun SettingsScreen(
                 )
             }
             SettingsRoute.GoogleCloud -> {
-                SettingsSubpageShell(
-                    title = "Integrations & Cloud Services",
+                GoogleCloudAndAiProvidersSubpage(
                     onBack = { currentRoute = SettingsRoute.Main }
-                ) {
-                    Text(
-                        text = "Cloud integrations, backup and connected services.",
-                        fontFamily = GoogleSans,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
+                )
             }
             SettingsRoute.Subscriptions -> {
                 SubscriptionsSubpage(
@@ -259,32 +250,14 @@ fun SettingsScreen(
                 )
             }
             SettingsRoute.About -> {
-                SettingsSubpageShell(
-                    title = "About Swiffle",
+                AboutSwiffleSubpage(
                     onBack = { currentRoute = SettingsRoute.Main }
-                ) {
-                    Text(
-                        text = "Swiffle PDF Viewer version and copyright details.",
-                        fontFamily = GoogleSans,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
+                )
             }
             SettingsRoute.HelpFeedback -> {
-                SettingsSubpageShell(
-                    title = "Help & Feedback",
+                HelpAndFeedbackSubpage(
                     onBack = { currentRoute = SettingsRoute.Main }
-                ) {
-                    Text(
-                        text = "Send feedback or get support from our team.",
-                        fontFamily = GoogleSans,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
+                )
             }
         }
     }
@@ -1593,6 +1566,9 @@ private fun GeneralSubpage(
         }
 
         // ── SECTION 1: PDF BEHAVIOR ────────────────────────────────────────────
+        var alwaysOpenFromBeginning by remember {
+            mutableStateOf(sharedPrefs.getBoolean("pref_always_open_beginning", true))
+        }
         Text(
             text = "PDF BEHAVIOR",
             fontFamily = GoogleSans,
@@ -1608,8 +1584,11 @@ private fun GeneralSubpage(
                 icon = Icons.Outlined.RestartAlt,
                 title = "Always Open From Beginning",
                 subtitle = "Documents cleanly open from Page 1 without jump locks.",
-                checked = true,
-                onCheckedChange = { /* Always active by design */ }
+                checked = alwaysOpenFromBeginning,
+                onCheckedChange = { isChecked ->
+                    alwaysOpenFromBeginning = isChecked
+                    sharedPrefs.edit().putBoolean("pref_always_open_beginning", isChecked).apply()
+                }
             )
         }
 

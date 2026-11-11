@@ -155,18 +155,11 @@ fun OnboardingScreen(
     var isAgreedToTerms by remember { mutableStateOf(false) }
     var isSpinningAuth by remember { mutableStateOf(false) }
 
-    // Real-time Storage Permission State
-    var isStorageGranted by remember { mutableStateOf(false) }
+    // Play-compliant Scoped Storage & SAF readiness (zero broad storage permissions required)
+    var isStorageGranted by remember { mutableStateOf(true) }
 
     fun checkPermissions() {
-        isStorageGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            ContextCompat.checkSelfPermission(
-                context,
-                android.Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
-        }
+        isStorageGranted = true
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -391,17 +384,7 @@ fun OnboardingScreen(
                         1 -> StageOneFeatureHub(
                             isStorageGranted = isStorageGranted,
                             onGrantStorage = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                        data = Uri.parse("package:${context.packageName}")
-                                    }
-                                    context.startActivity(intent)
-                                } else {
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = Uri.fromParts("package", context.packageName, null)
-                                    }
-                                    context.startActivity(intent)
-                                }
+                                isStorageGranted = true
                             },
                             onCompleteSetup = {
                                 coroutineScope.launch {
