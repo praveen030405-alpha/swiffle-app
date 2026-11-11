@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-files-path name="origami_output" path="." />
+    <cache-path name="origami_cache" path="." />
+    <files-path name="origami_internal" path="." />
+    <external-cache-path name="origami_ext_cache" path="." />
+    <external-path name="origami_external" path="." />
+</paths>

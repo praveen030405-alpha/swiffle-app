@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="page" x1="110" y1="48" x2="404" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A91625"/>
+      <stop offset="0.55" stop-color="#850D1B"/>
+      <stop offset="1" stop-color="#5B0812"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="330" y1="58" x2="431" y2="161" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5A0A7"/>
+      <stop offset="1" stop-color="#D94C5B"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="120" y1="52" x2="370" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="54" y="22" width="414" height="482" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <!-- Soft grounding shadow -->
+  <path d="M113 468C113 451 132 438 156 438H365C389 438 408 451 408 468C408 485 389 496 365 496H156C132 496 113 485 113 468Z" fill="#36050B" opacity="0.30" filter="url(#shadow)"/>
+  <!-- One standalone document card -->
+  <path d="M137 48H324L416 140V426C416 448.091 398.091 466 376 466H137C114.909 466 97 448.091 97 426V88C97 65.9086 114.909 48 137 48Z" fill="url(#page)"/>
+  <!-- Folded top-right corner -->
+  <path d="M324 48V112C324 127.464 336.536 140 352 140H416L324 48Z" fill="url(#fold)"/>
+  <path d="M324 48V112C324 127.464 336.536 140 352 140H416" stroke="#F8C2C6" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Subtle upper sheen -->
+  <path d="M137 48H324L416 140V228H97V88C97 65.9086 114.909 48 137 48Z" fill="url(#shine)"/>
+  <!-- PDF label -->
+  <text x="256" y="319" fill="#FFF4F4" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="800" letter-spacing="-5" text-anchor="middle">PDF</text>
+  <!-- Small document text lines -->
+  <path d="M166 361H346" stroke="#F7BFC4" stroke-width="13" stroke-linecap="round" opacity="0.88"/>
+  <path d="M166 395H302" stroke="#F7BFC4" stroke-width="13" stroke-linecap="round" opacity="0.60"/>
+</svg>

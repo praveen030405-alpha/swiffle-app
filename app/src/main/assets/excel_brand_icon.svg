@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="excel_page" x1="110" y1="48" x2="404" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#107C41"/>
+      <stop offset="0.55" stop-color="#0B5A2F"/>
+      <stop offset="1" stop-color="#063D1F"/>
+    </linearGradient>
+    <linearGradient id="excel_fold" x1="330" y1="58" x2="431" y2="161" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#57D38C"/>
+      <stop offset="1" stop-color="#1BB363"/>
+    </linearGradient>
+    <linearGradient id="excel_shine" x1="120" y1="52" x2="370" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="excel_shadow" x="54" y="22" width="414" height="482" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <!-- Soft grounding shadow -->
+  <path d="M113 468C113 451 132 438 156 438H365C389 438 408 451 408 468C408 485 389 496 365 496H156C132 496 113 485 113 468Z" fill="#032111" opacity="0.30" filter="url(#excel_shadow)"/>
+  <!-- One standalone document card -->
+  <path d="M137 48H324L416 140V426C416 448.091 398.091 466 376 466H137C114.909 466 97 448.091 97 426V88C97 65.9086 114.909 48 137 48Z" fill="url(#excel_page)"/>
+  <!-- Folded top-right corner -->
+  <path d="M324 48V112C324 127.464 336.536 140 352 140H416L324 48Z" fill="url(#excel_fold)"/>
+  <path d="M324 48V112C324 127.464 336.536 140 352 140H416" stroke="#8CEAB2" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Subtle upper sheen -->
+  <path d="M137 48H324L416 140V228H97V88C97 65.9086 114.909 48 137 48Z" fill="url(#excel_shine)"/>
+  <!-- XLS label -->
+  <text x="256" y="318" fill="#F0FFF4" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="800" letter-spacing="-3" text-anchor="middle">XLS</text>
+  <!-- Table Grid Lines -->
+  <path d="M166 358H346" stroke="#8CEAB2" stroke-width="11" stroke-linecap="round" opacity="0.88"/>
+  <path d="M166 392H346" stroke="#8CEAB2" stroke-width="11" stroke-linecap="round" opacity="0.70"/>
+  <path d="M166 426H302" stroke="#8CEAB2" stroke-width="11" stroke-linecap="round" opacity="0.55"/>
+  <path d="M256 350V434" stroke="#8CEAB2" stroke-width="8" stroke-linecap="round" opacity="0.65"/>
+</svg>
