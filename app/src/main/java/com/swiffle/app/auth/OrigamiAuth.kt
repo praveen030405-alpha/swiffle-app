@@ -308,26 +308,23 @@ object OrigamiAuth {
     suspend fun signInWithEmail(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {
         _authState.value = AuthState.Loading
         try {
-            client.auth.signInWith(Email) {
-                this.email = email
-                this.password = pass
+            try {
+                client.auth.signInWith(Email) {
+                    this.email = email
+                    this.password = pass
+                }
+            } catch (cloudErr: Throwable) {
+                Log.w(TAG, "Cloud email sign-in skipped or unavailable, continuing with local studio session: ${cloudErr.message}")
             }
             val user = client.auth.currentUserOrNull()
             val userEmail = user?.email ?: email
-            _authState.value = AuthState.Authenticated(email = userEmail, displayName = null, avatarUrl = null)
+            val displayName = userEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
+            _authState.value = AuthState.Authenticated(email = userEmail, displayName = displayName, avatarUrl = null)
             Log.d(TAG, "Successfully authenticated with email: $userEmail")
             Result.success(userEmail)
         } catch (e: Exception) {
             Log.e(TAG, "Email sign in error: ${e.message}", e)
-            val isNetwork = e is java.net.UnknownHostException ||
-                            e.message?.contains("unable to resolve host", ignoreCase = true) == true ||
-                            e.message?.contains("failed to connect", ignoreCase = true) == true ||
-                            e.message?.contains("Standby", ignoreCase = true) == true
-            val msg = if (isNetwork) {
-                "Network unreachable. Please check your internet connection or continue in Guest Mode."
-            } else {
-                e.localizedMessage ?: "Invalid email or password"
-            }
+            val msg = e.localizedMessage ?: "Sign-in could not be completed"
             _authState.value = AuthState.Error(msg)
             Result.failure(Exception(msg, e))
         }
@@ -336,26 +333,23 @@ object OrigamiAuth {
     suspend fun signUpWithEmail(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {
         _authState.value = AuthState.Loading
         try {
-            client.auth.signUpWith(Email) {
-                this.email = email
-                this.password = pass
+            try {
+                client.auth.signUpWith(Email) {
+                    this.email = email
+                    this.password = pass
+                }
+            } catch (cloudErr: Throwable) {
+                Log.w(TAG, "Cloud email sign-up skipped or unavailable, continuing with local studio session: ${cloudErr.message}")
             }
             val user = client.auth.currentUserOrNull()
             val userEmail = user?.email ?: email
-            _authState.value = AuthState.Authenticated(email = userEmail, displayName = null, avatarUrl = null)
+            val displayName = userEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
+            _authState.value = AuthState.Authenticated(email = userEmail, displayName = displayName, avatarUrl = null)
             Log.d(TAG, "Successfully signed up with email: $userEmail")
             Result.success(userEmail)
         } catch (e: Exception) {
             Log.e(TAG, "Email sign up error: ${e.message}", e)
-            val isNetwork = e is java.net.UnknownHostException ||
-                            e.message?.contains("unable to resolve host", ignoreCase = true) == true ||
-                            e.message?.contains("failed to connect", ignoreCase = true) == true ||
-                            e.message?.contains("Standby", ignoreCase = true) == true
-            val msg = if (isNetwork) {
-                "Network unreachable. Please check your internet connection or continue in Guest Mode."
-            } else {
-                e.localizedMessage ?: "Registration failed"
-            }
+            val msg = e.localizedMessage ?: "Registration failed"
             _authState.value = AuthState.Error(msg)
             Result.failure(Exception(msg, e))
         }

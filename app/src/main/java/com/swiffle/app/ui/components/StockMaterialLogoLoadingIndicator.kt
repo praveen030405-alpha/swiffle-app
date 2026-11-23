@@ -1,25 +1,19 @@
 package com.swiffle.app.ui.components
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -30,14 +24,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.swiffle.app.R
-import com.swiffle.app.theme.GoogleSans
+import com.swiffle.app.theme.ClaudeSans
+import com.swiffle.app.theme.ClaudeSerif
 
 /**
- * Authentic Native Material 3 Pro SVG Logo Loading Indicator:
- * - Uses the official vector origami SVG logo (ic_swiffle_logo / ic_swiffle_icon)
- * - Continuous high-end diagonal specular shimmer beam traversing the origami folds
- * - Gentle pulsing breathing scale and subtle elevation glow
- * - Smooth upward diagonal fade-away exit transition when loading completes
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  M3 EXPRESSIVE MAROON LOADING SCREENS & DOCUMENT PILLS
+ * ══════════════════════════════════════════════════════════════════════════════
  */
 @Composable
 fun StockMaterialRocketContrails(
@@ -76,15 +69,13 @@ fun StockMaterialRocketContrails(
         label = "streak3"
     )
 
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val primaryColor = MaroonIvoryText
+    val tertiaryColor = MaroonAccentRose
 
     androidx.compose.foundation.Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
-        // Angle ~45° downward-left from center (exhaust trail for a rocket pointed ~45° upward-right)
-        // streak trajectories: Start near center, move diagonally down-left
         val baseAngleRad = Math.toRadians(225.0).toFloat()
         val dirX = kotlin.math.cos(baseAngleRad)
         val dirY = kotlin.math.sin(baseAngleRad)
@@ -100,7 +91,7 @@ fun StockMaterialRocketContrails(
             val travelDist = w * 0.7f
             val currDist = progress * travelDist
             val headX = (w * 0.5f + startXOffset) + dirX * currDist
-            val headY = (h * 0.5f + startYOffset) - dirY * currDist // invert Y for canvas coords
+            val headY = (h * 0.5f + startYOffset) - dirY * currDist
             val tailX = headX - dirX * streakLength
             val tailY = headY + dirY * streakLength
 
@@ -123,7 +114,6 @@ fun StockMaterialRocketContrails(
             )
         }
 
-        // Streak 1 (Center-left stream)
         drawContrailStreak(
             progress = streakProgress1,
             startXOffset = -w * 0.10f,
@@ -133,7 +123,6 @@ fun StockMaterialRocketContrails(
             color = primaryColor
         )
 
-        // Streak 2 (Center core stream)
         drawContrailStreak(
             progress = streakProgress2,
             startXOffset = -w * 0.02f,
@@ -143,7 +132,6 @@ fun StockMaterialRocketContrails(
             color = tertiaryColor
         )
 
-        // Streak 3 (Right stream)
         drawContrailStreak(
             progress = streakProgress3,
             startXOffset = w * 0.08f,
@@ -152,28 +140,9 @@ fun StockMaterialRocketContrails(
             strokeWidth = 2.8f,
             color = primaryColor
         )
-
-        // Streak 4 (Outer subtle stream)
-        val outerProgress = ((streakProgress1 + 0.45f) % 1f)
-        drawContrailStreak(
-            progress = outerProgress,
-            startXOffset = -w * 0.18f,
-            startYOffset = h * 0.02f,
-            streakLength = if (isLaunching) 70f else 36f,
-            strokeWidth = 2.2f,
-            color = tertiaryColor
-        )
     }
 }
 
-/**
- * Authentic Native Material 3 Pro SVG Logo Loading Indicator:
- * - Uses the official vector origami SVG logo (ic_swiffle_logo / ic_swiffle_icon)
- * - Aerodynamic zero-gravity floating with dual harmonic bobbing & micro pitch tilt
- * - Native Canvas rocket launch speed contrail lines
- * - Continuous high-end diagonal specular shimmer beam traversing origami folds
- * - Explosive hyper-drive diagonal rocket launch take-off on exit
- */
 @Composable
 fun StockMaterialLogoShimmer(
     modifier: Modifier = Modifier,
@@ -184,10 +153,9 @@ fun StockMaterialLogoShimmer(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "logo_shimmer_transition")
 
-    // Aerodynamic Harmonic Float (Y bobbing) - state read inside graphicsLayer directly without recomposition
     val floatOffsetY = infiniteTransition.animateFloat(
-        initialValue = -3.5f,
-        targetValue = 3.5f,
+        initialValue = -3.0f,
+        targetValue = 3.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -195,32 +163,9 @@ fun StockMaterialLogoShimmer(
         label = "float_offset_y"
     )
 
-    // Aerodynamic Drift (X sway)
-    val driftOffsetX = infiniteTransition.animateFloat(
-        initialValue = -1.5f,
-        targetValue = 1.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "drift_offset_x"
-    )
-
-    // Aerodynamic Pitch Tilt (Nose pitches slightly with buoyancy)
-    val pitchAngle = infiniteTransition.animateFloat(
-        initialValue = -2.5f,
-        targetValue = 1.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pitch_angle"
-    )
-
-    // Breathing pulse
     val pulseScale = infiniteTransition.animateFloat(
-        initialValue = 0.98f,
-        targetValue = 1.02f,
+        initialValue = 0.97f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -234,7 +179,6 @@ fun StockMaterialLogoShimmer(
         modifier = modifier.size(containerSize),
         contentAlignment = Alignment.Center
     ) {
-        // Rocket Contrail Speed Lines streaming beneath
         if (showRocketContrails) {
             StockMaterialRocketContrails(
                 modifier = Modifier
@@ -251,8 +195,8 @@ fun StockMaterialLogoShimmer(
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFFFFB74D).copy(alpha = 0.22f),
-                                Color(0xFFE91E63).copy(alpha = 0.10f),
+                                MaroonAccentRose.copy(alpha = 0.22f),
+                                Color.White.copy(alpha = 0.08f),
                                 Color.Transparent
                             )
                         ),
@@ -261,14 +205,11 @@ fun StockMaterialLogoShimmer(
             )
         }
 
-        // Floating Aerodynamic SVG Logo - RenderThread direct execution, zero jank
         Box(
             modifier = Modifier
                 .size(size)
                 .graphicsLayer {
-                    translationX = driftOffsetX.value * density
                     translationY = floatOffsetY.value * density
-                    rotationZ = pitchAngle.value
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
                 },
@@ -284,20 +225,10 @@ fun StockMaterialLogoShimmer(
 }
 
 /**
- * Fullscreen Native Material 3 Pro Loading Screen with:
- * - Centered shimmering vector origami SVG logo
- * - Dynamic rocket floating & animated speed streak contrails
- * - Modern typography labels (compact 15sp SemiBold)
- * - Seamless diagonal upward rocket launch take-off exit transition:
- *   Alpha decays while blasting diagonally (X += 130dp, Y -= 190dp)
- */
-/**
- * Immersive Fullscreen Backdrop-Blurred Loading Screen:
- * - Replaces any awkward floating square boxes with a seamless, full-screen frosted glass overlay
- * - Authentic backdrop blur effect over underlying auth and onboarding flow
- * - Radiant origami vector logo with ambient breathing aura glow
- * - High-precision indeterminate progress indicator
- * - Executive typography for title and descriptive sync message
+ * Full-Screen M3 Expressive Morphing Shape Loading Screen on #440E03 Maroon Cloth:
+ * - Uses `M3ExpressiveMorphingShapeLoader` with centered Swiffle emblem
+ * - Uses `ClaudeSerif` for headline and `ClaudeSans` for subtitle
+ * - Styled over the #440E03 Maroon Cloth with mild-white glassmorphism
  */
 @Composable
 fun StockMaterialLogoLoadingScreen(
@@ -308,23 +239,16 @@ fun StockMaterialLogoLoadingScreen(
 ) {
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing),
+        animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing),
         label = "logo_loading_alpha"
     )
 
     if (visible || alpha > 0.01f) {
-        val isDark = com.swiffle.app.theme.ThemeManager.isDarkThemeActive()
-        val frostedScrim = if (isDark) {
-            Color(0xFF000000).copy(alpha = 0.78f)
-        } else {
-            Color(0xFFFFFFFF).copy(alpha = 0.82f)
-        }
-
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .alpha(alpha)
-                .background(frostedScrim),
+                .background(Color(0xFF440E03).copy(alpha = 0.94f)),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -332,68 +256,35 @@ fun StockMaterialLogoLoadingScreen(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 36.dp)
+                    .padding(horizontal = 32.dp)
             ) {
-                // Floating Aerodynamic Logo with Ambient Starburst Aura Glow
-                Box(
-                    modifier = Modifier.size(110.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Soft ambient gradient backplate glow
-                    Box(
-                        modifier = Modifier
-                            .size(96.dp)
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0xFF0078D4).copy(alpha = if (isDark) 0.35f else 0.18f),
-                                        Color(0xFF9B51E0).copy(alpha = if (isDark) 0.20f else 0.08f),
-                                        Color.Transparent
-                                    )
-                                ),
-                                shape = CircleShape
-                            )
-                    )
-
-                    StockMaterialLogoShimmer(
-                        size = 72.dp,
-                        showContainerHalo = false,
-                        showRocketContrails = false,
-                        isLaunching = false
-                    )
-                }
+                M3ExpressiveMorphingShapeLoader(
+                    size = 116.dp,
+                    showCenterEmblem = true,
+                    emblemSize = 50.dp
+                )
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Fluent Cobalt Blue Progress Spinner
-                StockMaterialLoadingIndicator(
-                    size = 30.dp,
-                    strokeWidth = 3.dp,
-                    useGoogleColors = false,
-                    tint = Color(0xFF0078D4)
-                )
-
-                Spacer(modifier = Modifier.height(22.dp))
-
-                // Title
                 Text(
                     text = title,
-                    fontFamily = GoogleSans,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                    fontFamily = ClaudeSerif,
+                    fontSize = 26.sp,
+                    lineHeight = 34.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaroonIvoryText,
                     textAlign = TextAlign.Center,
-                    letterSpacing = 0.2.sp
+                    letterSpacing = (-0.2).sp
                 )
 
                 if (!subtitle.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = subtitle,
-                        fontFamily = GoogleSans,
-                        fontSize = 13.5.sp,
-                        lineHeight = 19.sp,
-                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569),
+                        fontFamily = ClaudeSans,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        color = MaroonBlushSecondary,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 12.dp)
                     )
@@ -403,15 +294,6 @@ fun StockMaterialLogoLoadingScreen(
     }
 }
 
-/**
- * Floating Material 3 Rounded Pill for Third-Party PDF Launches:
- * Displays over the transparent background of the caller application
- * showing "Opening Document" alongside our official SVG Origami logo.
- */
-/**
- * Resolves human-friendly display titles based on the file extension.
- * Handles PDF, Excel (.xlsx, .xls, .csv), Word Docx (.docx, .doc), PowerPoint, Text, and generic documents.
- */
 fun getDocumentClosingTitle(fileNameOrTitle: String, uri: android.net.Uri? = null): String {
     val clean = (fileNameOrTitle.ifBlank { uri?.lastPathSegment ?: "" }).trim().lowercase()
     return when {
@@ -439,8 +321,8 @@ fun getDocumentOpeningTitle(fileNameOrTitle: String, uri: android.net.Uri? = nul
 }
 
 /**
- * Centered rounded-corner pill displayed while opening a document.
- * Adapts to user preference (Light and Dark themes) with crisp M3 Expressive aesthetics.
+ * Centered Mild-White Glassmorphic Pill with M3 Expressive Morphing Shape Loader
+ * displayed while opening a document.
  */
 @Composable
 fun PdfOpeningPill(
@@ -464,42 +346,56 @@ fun PdfOpeningPill(
         label = "opening_pulse_alpha"
     )
 
-    val supportsBlur = remember { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
-    val scrimColor = if (isDark) {
-        if (supportsBlur) Color.Black.copy(alpha = 0.38f) else Color.Black.copy(alpha = 0.58f)
-    } else {
-        if (supportsBlur) Color(0xFF0F172A).copy(alpha = 0.15f) else Color(0xFF0F172A).copy(alpha = 0.30f)
-    }
-
-    val surfaceColor = if (isDark) Color(0xFF1E1E1E).copy(alpha = 0.95f) else Color(0xFFFFFFFF).copy(alpha = 0.95f)
-    val borderColor = if (isDark) Color.White.copy(alpha = 0.16f) else Color(0xFF0F172A).copy(alpha = 0.08f)
-    val textPrimaryColor = if (isDark) Color.White else Color(0xFF0F172A)
-    val textMutedColor = if (isDark) Color.White.copy(alpha = 0.60f) else Color(0xFF64748B)
+    val pillShape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(scrimColor),
+            .background(Color(0xFF240601).copy(alpha = 0.56f)),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(26.dp),
-            color = surfaceColor,
-            shadowElevation = 14.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        Box(
             modifier = Modifier
                 .wrapContentSize()
                 .padding(horizontal = 24.dp)
+                .clip(pillShape)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF4E1205).copy(alpha = 0.96f),
+                            Color(0xFF380B02).copy(alpha = 0.98f)
+                        )
+                    )
+                )
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.14f),
+                            Color.White.copy(alpha = 0.05f)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.42f),
+                            Color(0xFFF7DAD9).copy(alpha = 0.20f),
+                            Color.White.copy(alpha = 0.10f)
+                        )
+                    ),
+                    shape = pillShape
+                )
         ) {
             Row(
                 modifier = Modifier
-                    .padding(start = 18.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 18.dp, end = 24.dp, top = 14.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                StockMaterialLogoShimmer(
-                    size = 36.dp,
-                    showContainerHalo = true,
-                    showRocketContrails = false
+                M3ExpressiveMorphingShapeLoader(
+                    size = 46.dp,
+                    showCenterEmblem = true,
+                    emblemSize = 22.dp
                 )
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -509,10 +405,10 @@ fun PdfOpeningPill(
                 ) {
                     Text(
                         text = titleText,
-                        color = textPrimaryColor,
-                        fontSize = 15.sp,
+                        color = MaroonIvoryText,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = GoogleSans,
+                        fontFamily = ClaudeSerif,
                         letterSpacing = (-0.2).sp,
                         modifier = Modifier.graphicsLayer {
                             alpha = pulseAlpha.value
@@ -520,11 +416,11 @@ fun PdfOpeningPill(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "High-Resolution Display",
-                        color = textMutedColor,
-                        fontSize = 11.5.sp,
+                        text = "High-resolution vector canvas",
+                        color = MaroonBlushSecondary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
-                        fontFamily = GoogleSans
+                        fontFamily = ClaudeSans
                     )
                 }
             }
@@ -532,9 +428,6 @@ fun PdfOpeningPill(
     }
 }
 
-/**
- * Backward compatibility alias for ExternalPdfLoadingPill.
- */
 @Composable
 fun ExternalPdfLoadingPill(
     documentTitle: String = "",
@@ -546,8 +439,8 @@ fun ExternalPdfLoadingPill(
 }
 
 /**
- * Centered rounded-corner pill displayed seamlessly while closing a document.
- * Adapts to user preference (Light and Dark themes) with crisp M3 Expressive aesthetics.
+ * Centered Mild-White Glassmorphic Pill with M3 Expressive Morphing Shape Loader
+ * displayed seamlessly while closing a document.
  */
 @Composable
 fun PdfClosingPill(
@@ -571,42 +464,56 @@ fun PdfClosingPill(
         label = "closing_pulse_alpha"
     )
 
-    val supportsBlur = remember { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
-    val scrimColor = if (isDark) {
-        if (supportsBlur) Color.Black.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.55f)
-    } else {
-        if (supportsBlur) Color(0xFF0F172A).copy(alpha = 0.15f) else Color(0xFF0F172A).copy(alpha = 0.30f)
-    }
-
-    val surfaceColor = if (isDark) Color(0xFF1E1E1E).copy(alpha = 0.95f) else Color(0xFFFFFFFF).copy(alpha = 0.95f)
-    val borderColor = if (isDark) Color.White.copy(alpha = 0.16f) else Color(0xFF0F172A).copy(alpha = 0.08f)
-    val textPrimaryColor = if (isDark) Color.White else Color(0xFF0F172A)
-    val textMutedColor = if (isDark) Color.White.copy(alpha = 0.60f) else Color(0xFF64748B)
+    val pillShape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(scrimColor),
+            .background(Color(0xFF240601).copy(alpha = 0.52f)),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(26.dp),
-            color = surfaceColor,
-            shadowElevation = 14.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        Box(
             modifier = Modifier
                 .wrapContentSize()
                 .padding(horizontal = 24.dp)
+                .clip(pillShape)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF4E1205).copy(alpha = 0.96f),
+                            Color(0xFF380B02).copy(alpha = 0.98f)
+                        )
+                    )
+                )
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.14f),
+                            Color.White.copy(alpha = 0.05f)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.42f),
+                            Color(0xFFF7DAD9).copy(alpha = 0.20f),
+                            Color.White.copy(alpha = 0.10f)
+                        )
+                    ),
+                    shape = pillShape
+                )
         ) {
             Row(
                 modifier = Modifier
-                    .padding(start = 18.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = 18.dp, end = 24.dp, top = 14.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                StockMaterialLogoShimmer(
-                    size = 36.dp,
-                    showContainerHalo = true,
-                    showRocketContrails = false
+                M3ExpressiveMorphingShapeLoader(
+                    size = 46.dp,
+                    showCenterEmblem = true,
+                    emblemSize = 22.dp
                 )
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -616,10 +523,10 @@ fun PdfClosingPill(
                 ) {
                     Text(
                         text = titleText,
-                        color = textPrimaryColor,
-                        fontSize = 15.sp,
+                        color = MaroonIvoryText,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = GoogleSans,
+                        fontFamily = ClaudeSerif,
                         letterSpacing = (-0.2).sp,
                         modifier = Modifier.graphicsLayer {
                             alpha = pulseAlpha.value
@@ -627,11 +534,11 @@ fun PdfClosingPill(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Saving Reading Progress",
-                        color = textMutedColor,
-                        fontSize = 11.5.sp,
+                        text = "Saving reading progress",
+                        color = MaroonBlushSecondary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
-                        fontFamily = GoogleSans
+                        fontFamily = ClaudeSans
                     )
                 }
             }

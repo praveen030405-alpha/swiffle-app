@@ -381,6 +381,17 @@ private fun MainSettingsHub(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val currentThemeMode by ThemeManager.themeMode.collectAsState()
+    val numberFmt = remember { java.text.NumberFormat.getIntegerInstance() }
+    var liveUsageSnapshot by remember {
+        mutableStateOf(com.swiffle.app.ai.SwiffleAiConfig.getUsageRateSnapshot(context))
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            liveUsageSnapshot = com.swiffle.app.ai.SwiffleAiConfig.getUsageRateSnapshot(context)
+            delay(1500L)
+        }
+    }
 
     // Interactive tooltip state for Google-authenticated users attempting to edit profile
     var showGoogleAuthTooltip by remember { mutableStateOf(false) }
@@ -944,6 +955,88 @@ private fun MainSettingsHub(
                 color = fluentCobalt,
                 modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
             )
+            // Live AI Rate, Usage & Limits Summary Card
+            val tokenProgress = (liveUsageSnapshot.totalTokensToday.toFloat() /
+                liveUsageSnapshot.dailyTokenQuota.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+            Surface(
+                onClick = { onNavigate(SettingsRoute.UsageLimits) },
+                shape = RoundedCornerShape(8.dp),
+                color = winUiCard,
+                border = BorderStroke(1.dp, winUiBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = liveUsageSnapshot.activeModelDisplayName,
+                                fontFamily = GoogleSans,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.5.sp,
+                                color = textPrimary
+                            )
+                            Text(
+                                text = liveUsageSnapshot.activeProviderLabel,
+                                fontFamily = GoogleSans,
+                                fontSize = 12.sp,
+                                color = textMuted
+                            )
+                        }
+                        Text(
+                            text = if (liveUsageSnapshot.cooldownRemainingSec > 0) {
+                                "Cooldown ${liveUsageSnapshot.cooldownRemainingSec}s"
+                            } else {
+                                "${liveUsageSnapshot.currentRpm}/${liveUsageSnapshot.rpmLimit} RPM"
+                            },
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.5.sp,
+                            color = if (liveUsageSnapshot.cooldownRemainingSec > 0) {
+                                Color(0xFFD97706)
+                            } else {
+                                fluentCobalt
+                            }
+                        )
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { tokenProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                            .clip(CircleShape),
+                        color = fluentCobalt,
+                        trackColor = textMuted.copy(alpha = 0.16f)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${numberFmt.format(liveUsageSnapshot.totalTokensToday)} / ${numberFmt.format(liveUsageSnapshot.dailyTokenQuota)} tok",
+                            fontFamily = GoogleSans,
+                            fontSize = 11.5.sp,
+                            color = textMuted
+                        )
+                        Text(
+                            text = "${liveUsageSnapshot.currentRpd}/${liveUsageSnapshot.rpdLimit} RPD • ${numberFmt.format(liveUsageSnapshot.currentTpm)}/${numberFmt.format(liveUsageSnapshot.tpmLimit)} TPM",
+                            fontFamily = GoogleSans,
+                            fontSize = 11.5.sp,
+                            color = textMuted
+                        )
+                    }
+                }
+            }
             SettingsGroupCard {
                 SettingsItemRow(
                     iconPainter = androidx.compose.ui.res.painterResource(id = com.swiffle.app.R.drawable.ic_swiffle_logo_monochrome),
@@ -954,6 +1047,11 @@ private fun MainSettingsHub(
                 SettingsItemRow(
                     icon = Icons.Outlined.CloudQueue,
                     title = "Integrations & Cloud Services",
+                    subtitle = if (liveUsageSnapshot.hasGeminiKey) {
+                        "Gemini Free Tier (${liveUsageSnapshot.keySourceLabel})"
+                    } else {
+                        "Configure Gemini, Groq & OpenRouter keys"
+                    },
                     onClick = { onNavigate(SettingsRoute.GoogleCloud) }
                 )
                 SettingsItemDivider()
@@ -966,6 +1064,7 @@ private fun MainSettingsHub(
                 SettingsItemRow(
                     icon = Icons.Outlined.DataUsage,
                     title = "Usage and limits",
+                    subtitle = "${liveUsageSnapshot.currentRpm}/${liveUsageSnapshot.rpmLimit} RPM • ${liveUsageSnapshot.currentRpd}/${liveUsageSnapshot.rpdLimit} RPD • ${numberFmt.format(liveUsageSnapshot.totalTokensToday)} tok",
                     onClick = { onNavigate(SettingsRoute.UsageLimits) }
                 )
             }

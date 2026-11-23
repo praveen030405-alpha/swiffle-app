@@ -44,6 +44,18 @@ object PdfThumbnailManager {
         }
     }
 
+    fun clearMemoryCache() {
+        try {
+            memoryCache.evictAll()
+        } catch (_: Throwable) {}
+    }
+
+    fun trimToHalf() {
+        try {
+            memoryCache.trimToSize(memoryCache.size() / 2)
+        } catch (_: Throwable) {}
+    }
+
     suspend fun getOrRenderThumbnail(
         context: Context,
         uri: Uri,

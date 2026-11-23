@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Base application theme using Swiffle Alabaster / Light Grey-White canvas -->
+    <!-- Base application theme matching #440E03 Maroon Cloth so no black or white flash occurs before Splash -->
     <style name="Theme.OrigamiPDF" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#F4F5F8</item>
-        <item name="android:statusBarColor">#F4F5F8</item>
-        <item name="android:navigationBarColor">#F4F5F8</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@drawable/bg_window_maroon</item>
+        <item name="android:colorBackground">@color/maroon_splash_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <style name="Theme.OrigamiPDF.Transparent" parent="android:Theme.Material.NoActionBar">

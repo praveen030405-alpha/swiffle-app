@@ -23,3 +23,6 @@ build_err.txt
 *.png
 lora.zip
 download_fonts.py
+
+# Environment secrets
+.env

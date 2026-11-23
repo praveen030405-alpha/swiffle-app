@@ -45,10 +45,18 @@ data class StreamChoice(
 )
 
 @Serializable
+data class StreamUsage(
+    @SerialName("prompt_tokens") val promptTokens: Int = 0,
+    @SerialName("completion_tokens") val completionTokens: Int = 0,
+    @SerialName("total_tokens") val totalTokens: Int = 0
+)
+
+@Serializable
 data class StreamChunkResponse(
     @SerialName("id") val id: String? = null,
     @SerialName("model") val model: String? = null,
-    @SerialName("choices") val choices: List<StreamChoice> = emptyList()
+    @SerialName("choices") val choices: List<StreamChoice> = emptyList(),
+    @SerialName("usage") val usage: StreamUsage? = null
 )
 
 // ============================================================================
@@ -56,6 +64,9 @@ data class StreamChunkResponse(
 // ============================================================================
 
 sealed interface SwiffleAiStreamEvent {
+    /** Emitted for structured, human-readable SSE lifecycle status updates */
+    data class StatusUpdate(val message: String) : SwiffleAiStreamEvent
+
     /** Emitted as new text tokens stream in real time */
     data class Token(val text: String) : SwiffleAiStreamEvent
 
@@ -74,7 +85,11 @@ sealed interface SwiffleAiStreamEvent {
         val fullText: String,
         val engineUsed: String,
         val latencyMs: Long,
-        val totalTokens: Int = 0
+        val totalTokens: Int = 0,
+        val promptTokens: Int = 0,
+        val outputTokens: Int = 0,
+        val thoughtTokens: Int = 0,
+        val modelId: String = ""
     ) : SwiffleAiStreamEvent
 
     /** Emitted when the user is offline and has not yet downloaded the model */
@@ -82,6 +97,87 @@ sealed interface SwiffleAiStreamEvent {
 
     /** Error state with user-facing recovery instructions */
     data class Error(val error: SwiffleAiException) : SwiffleAiStreamEvent
+}
+
+/**
+ * Stateful SSE chunk splitter that cleanly separates `<think>...</think>` inline reasoning
+ * from user-facing response tokens, even when tags span chunk boundaries.
+ */
+internal class SseThinkTagSplitter {
+    private var inThinkBlock = false
+    private val pending = StringBuilder()
+
+    fun processChunk(
+        chunk: String,
+        onThinking: (String) -> Unit,
+        onToken: (String) -> Unit
+    ) {
+        if (chunk.isEmpty()) return
+        pending.append(chunk)
+
+        while (pending.isNotEmpty()) {
+            val current = pending.toString()
+            if (inThinkBlock) {
+                val closeIdx = current.indexOf("</think>")
+                if (closeIdx >= 0) {
+                    if (closeIdx > 0) {
+                        onThinking(current.substring(0, closeIdx))
+                    }
+                    pending.delete(0, closeIdx + "</think>".length)
+                    inThinkBlock = false
+                } else {
+                    val holdLen = partialSuffixLength(current, "</think>")
+                    val emitLen = current.length - holdLen
+                    if (emitLen > 0) {
+                        onThinking(current.substring(0, emitLen))
+                        pending.delete(0, emitLen)
+                    }
+                    break
+                }
+            } else {
+                val openIdx = current.indexOf("<think>")
+                if (openIdx >= 0) {
+                    if (openIdx > 0) {
+                        onToken(current.substring(0, openIdx))
+                    }
+                    pending.delete(0, openIdx + "<think>".length)
+                    inThinkBlock = true
+                } else {
+                    val holdLen = partialSuffixLength(current, "<think>")
+                    val emitLen = current.length - holdLen
+                    if (emitLen > 0) {
+                        onToken(current.substring(0, emitLen))
+                        pending.delete(0, emitLen)
+                    }
+                    break
+                }
+            }
+        }
+    }
+
+    fun flush(
+        onThinking: (String) -> Unit,
+        onToken: (String) -> Unit
+    ) {
+        if (pending.isEmpty()) return
+        val remaining = pending.toString()
+        pending.clear()
+        if (inThinkBlock) {
+            onThinking(remaining)
+        } else {
+            onToken(remaining)
+        }
+    }
+
+    private fun partialSuffixLength(text: String, tag: String): Int {
+        val maxCheck = minOf(text.length, tag.length - 1)
+        for (len in maxCheck downTo 1) {
+            if (text.endsWith(tag.substring(0, len))) {
+                return len
+            }
+        }
+        return 0
+    }
 }
 
 // ============================================================================
@@ -178,4 +274,73 @@ enum class SwiffleAiTask(
                - Never output raw unformatted asterisks, broken tags, or repetitive template greetings.
         """.trimIndent()
     )
+}
+
+enum class SwiffleModelTier(
+    val id: String,
+    val displayName: String,
+    val tagline: String,
+    val geminiModelId: String,
+    val freeRpmLimit: Int,
+    val freeTpmLimit: Int,
+    val freeRpdLimit: Int,
+    val groqModelId: String,
+    val openRouterModelId: String,
+    val pollinationsModelId: String,
+    val defaultTemperature: Float
+) {
+    OMNI(
+        id = "swiffle_omni",
+        displayName = "Swiffle Omni",
+        tagline = "Balanced speed and reasoning for everyday tasks",
+        geminiModelId = SwiffleAiConfig.GEMINI_MODEL_FLASH,
+        freeRpmLimit = 10,
+        freeTpmLimit = 250_000,
+        freeRpdLimit = 250,
+        groqModelId = SwiffleAiConfig.GROQ_MODEL_TABLES,
+        openRouterModelId = SwiffleAiConfig.OPENROUTER_MODEL_PRIMARY,
+        pollinationsModelId = "openai-fast",
+        defaultTemperature = 0.25f
+    ),
+    FLASH(
+        id = "swiffle_flash",
+        displayName = "Swiffle Flash",
+        tagline = "Instant, lightweight replies at maximum speed",
+        geminiModelId = SwiffleAiConfig.GEMINI_MODEL_FLASH_LITE,
+        freeRpmLimit = 15,
+        freeTpmLimit = 250_000,
+        freeRpdLimit = 1_000,
+        groqModelId = SwiffleAiConfig.GROQ_MODEL_PRIMARY,
+        openRouterModelId = SwiffleAiConfig.OPENROUTER_MODEL_GEMMA,
+        pollinationsModelId = "openai-fast",
+        defaultTemperature = 0.20f
+    ),
+    ULTRA(
+        id = "swiffle_ultra",
+        displayName = "Swiffle Ultra",
+        tagline = "Deep reasoning for complex analysis and synthesis",
+        geminiModelId = SwiffleAiConfig.GEMINI_MODEL_PRO,
+        freeRpmLimit = 5,
+        freeTpmLimit = 250_000,
+        freeRpdLimit = 25,
+        groqModelId = SwiffleAiConfig.GROQ_MODEL_SUPREME,
+        openRouterModelId = SwiffleAiConfig.OPENROUTER_MODEL_FALLBACK,
+        pollinationsModelId = "openai-large",
+        defaultTemperature = 0.15f
+    );
+
+    companion object {
+        fun fromId(id: String?): SwiffleModelTier {
+            return when (id) {
+                "swiffle_1_omni" -> OMNI
+                "swiffle_1_flash" -> FLASH
+                "swiffle_1_pro" -> ULTRA
+                else -> entries.firstOrNull { it.id == id } ?: OMNI
+            }
+        }
+
+        fun fromGeminiModelId(modelId: String?): SwiffleModelTier? {
+            return entries.firstOrNull { it.geminiModelId == modelId }
+        }
+    }
 }

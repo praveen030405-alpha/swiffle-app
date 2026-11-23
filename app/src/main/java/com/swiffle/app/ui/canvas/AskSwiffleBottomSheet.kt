@@ -96,7 +96,8 @@ data class SwiffleChatMessage(
     val thinkingDurationSec: Int? = null,
     val isThinkingExpanded: Boolean = false,
     val attachedFileName: String? = null,
-    val attachedPhotoUri: android.net.Uri? = null
+    val attachedPhotoUri: android.net.Uri? = null,
+    val isErrorNotice: Boolean = false
 )
 
 /**
@@ -385,7 +386,6 @@ fun AskSwiffleBottomSheet(
                                 thinkingDurationSec = elapsedSec
                             )
                         }
-                        recordTokenUsage(tokenCount)
                     }
                     is SwiffleAiStreamEvent.Error -> {
                         if (!hasReceivedTokens) {

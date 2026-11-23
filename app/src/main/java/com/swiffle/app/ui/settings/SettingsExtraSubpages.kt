@@ -57,16 +57,28 @@ fun GoogleCloudAndAiProvidersSubpage(
     var selectedProvider by remember {
         mutableStateOf(SwiffleAiConfig.getPreferredProvider(context))
     }
+    var geminiKeyInput by remember {
+        val prefs = context.getSharedPreferences(SwiffleAiConfig.SYNC_PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        mutableStateOf(prefs.getString("gemini_api_key", "") ?: "")
+    }
+    val hasSecretsGeminiKey = remember { SwiffleAiConfig.hasBuildConfigGeminiKey() }
     var groqKeyInput by remember {
         mutableStateOf(SwiffleAiConfig.getGroqApiKeySync(context))
     }
     var openRouterKeyInput by remember {
         mutableStateOf(SwiffleAiConfig.getOpenRouterApiKeySync(context))
     }
+    var showGeminiKey by remember { mutableStateOf(false) }
     var showGroqKey by remember { mutableStateOf(false) }
     var showOpenRouterKey by remember { mutableStateOf(false) }
+    var selectedGeminiModel by remember {
+        mutableStateOf(SwiffleAiConfig.getPreferredGeminiModel(context))
+    }
     var selectedGroqModel by remember {
         mutableStateOf(SwiffleAiConfig.getPreferredGroqModel(context))
+    }
+    val liveRateSnapshot by remember {
+        mutableStateOf(SwiffleAiConfig.getUsageRateSnapshot(context))
     }
 
     val offlineModels = remember { SwiffleOfflineModels(context) }
@@ -116,7 +128,12 @@ fun GoogleCloudAndAiProvidersSubpage(
                         Triple(
                             SwiffleAiConfig.PROVIDER_AUTO,
                             "Auto Failover (Recommended)",
-                            "Routes via Groq Cloud LPU first, then OpenRouter fallback."
+                            "Exhausts Groq Free & OpenRouter Free tiers first, then switches to Gemini Free Tier."
+                        ),
+                        Triple(
+                            SwiffleAiConfig.PROVIDER_GEMINI,
+                            "Google Gemini Free Tier",
+                            "Streams directly via gemini-2.5-flash, 2.5 Flash-Lite, and 2.5 Pro."
                         ),
                         Triple(
                             SwiffleAiConfig.PROVIDER_GROQ,
@@ -127,16 +144,12 @@ fun GoogleCloudAndAiProvidersSubpage(
                             SwiffleAiConfig.PROVIDER_OPENROUTER,
                             "OpenRouter Multi-Model Gateway",
                             "Streams via Llama 3.3 70B & Qwen 2.5 72B Instruct."
-                        ),
-                        Triple(
-                            SwiffleAiConfig.PROVIDER_FIREBASE_GEMINI,
-                            "Google Firebase Gemini",
-                            "Requires Firebase AI Logic setup (currently in labeled preview mode)."
                         )
                     )
 
                     providers.forEach { (id, title, subtitle) ->
-                        val isSelected = selectedProvider == id
+                        val isSelected = selectedProvider == id ||
+                            (id == SwiffleAiConfig.PROVIDER_GEMINI && selectedProvider == SwiffleAiConfig.PROVIDER_FIREBASE_GEMINI)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = if (isSelected) accentBlue.copy(alpha = 0.10f) else Color.Transparent,
@@ -186,9 +199,72 @@ fun GoogleCloudAndAiProvidersSubpage(
                 }
             }
 
-            // ── SECTION 2: CUSTOM API KEYS (GROQ & OPENROUTER) ────────────────
+            // ── SECTION 2: GEMINI FREE TIER MODELS & LIVE RATES ───────────────
             Text(
-                text = "CUSTOM API CREDENTIALS",
+                text = "GEMINI FREE TIER MODELS & RATE LIMITS",
+                fontFamily = GoogleSans,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.5.sp,
+                letterSpacing = 0.8.sp,
+                color = accentBlue,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = winUiCard,
+                border = BorderStroke(1.dp, winUiBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val geminiModelIds = remember { SwiffleAiConfig.GEMINI_FREE_MODELS.map { it.modelId }.toSet() }
+                    liveRateSnapshot.perModelStats
+                        .filter { it.modelId in geminiModelIds }
+                        .forEach { stat ->
+                        val isSelected = selectedGeminiModel == stat.modelId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    selectedGeminiModel = stat.modelId
+                                    SwiffleAiConfig.setPreferredGeminiModel(context, stat.modelId)
+                                    Toast.makeText(context, "Default Gemini model: ${stat.displayName}", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    selectedGeminiModel = stat.modelId
+                                    SwiffleAiConfig.setPreferredGeminiModel(context, stat.modelId)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${stat.displayName} (${stat.tierLabel})",
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.5.sp,
+                                    color = textPrimary
+                                )
+                                Text(
+                                    text = "${stat.modelId} • ${stat.requestsLastMinute}/${stat.rpmLimit} RPM • ${stat.requestsToday}/${stat.rpdLimit} RPD",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = textMuted
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── SECTION 3: API CREDENTIALS (GEMINI, GROQ & OPENROUTER) ────────
+            Text(
+                text = "API CREDENTIALS",
                 fontFamily = GoogleSans,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.5.sp,
@@ -205,10 +281,30 @@ fun GoogleCloudAndAiProvidersSubpage(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Enter your personal Groq (gsk_...) or OpenRouter (sk-or-...) API keys for dedicated rate limits.",
+                        text = if (hasSecretsGeminiKey) {
+                            "Gemini API Key is active from AI Studio Secrets (BuildConfig). Optionally override it below or add Groq/OpenRouter fallback keys."
+                        } else {
+                            "Configure GEMINI_API_KEY in AI Studio Secrets or paste your Gemini / Groq / OpenRouter keys below."
+                        },
                         fontFamily = GoogleSans,
                         fontSize = 12.5.sp,
                         color = textMuted
+                    )
+
+                    OutlinedTextField(
+                        value = geminiKeyInput,
+                        onValueChange = { newValue -> geminiKeyInput = newValue },
+                        label = { Text("Google Gemini API Key (Optional Override)", fontFamily = GoogleSans) },
+                        singleLine = true,
+                        visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            TextButton(onClick = { showGeminiKey = !showGeminiKey }) {
+                                Text(if (showGeminiKey) "Hide" else "Show", fontSize = 12.sp)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("gemini_api_key_input")
                     )
 
                     OutlinedTextField(
@@ -245,6 +341,7 @@ fun GoogleCloudAndAiProvidersSubpage(
 
                     Button(
                         onClick = {
+                            SwiffleAiConfig.saveGeminiApiKeySync(context, geminiKeyInput)
                             SwiffleAiConfig.saveGroqApiKeySync(context, groqKeyInput)
                             SwiffleAiConfig.saveOpenRouterApiKeySync(context, openRouterKeyInput)
                             Toast.makeText(context, "API keys saved securely", Toast.LENGTH_SHORT).show()
@@ -253,7 +350,7 @@ fun GoogleCloudAndAiProvidersSubpage(
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
+                            .height(48.dp)
                             .testTag("save_api_keys_button")
                     ) {
                         Text(

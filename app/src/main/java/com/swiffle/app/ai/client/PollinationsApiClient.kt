@@ -2,6 +2,7 @@ package com.swiffle.app.ai.client
 
 import com.swiffle.app.ai.AiChatMessage
 import com.swiffle.app.ai.AiChatRequest
+import com.swiffle.app.ai.SseThinkTagSplitter
 import com.swiffle.app.ai.StreamChunkResponse
 import com.swiffle.app.ai.SwiffleAiException
 import com.swiffle.app.ai.SwiffleAiStreamEvent
@@ -80,8 +81,13 @@ class PollinationsApiClient(
 
             val body = response.body ?: throw SwiffleAiException.StreamInterrupted("Empty response body")
             val reader = BufferedReader(InputStreamReader(body.byteStream(), Charsets.UTF_8))
+            emit(SwiffleAiStreamEvent.StatusUpdate("Stream connected. Waiting for the model to begin responding."))
+
             val fullAccumulatedText = StringBuilder()
             var tokenCount = 0
+            val splitter = SseThinkTagSplitter()
+            val pendingThinking = mutableListOf<String>()
+            val pendingTokens = mutableListOf<String>()
 
             var line: String? = reader.readLine()
             while (line != null) {
@@ -105,33 +111,23 @@ class PollinationsApiClient(
                                 emit(SwiffleAiStreamEvent.Thinking(reasoning))
                             }
 
-                            // Standard content tokens - Also parse streaming <think>...</think> if present
+                            // Standard content tokens - cleanly separate <think>...</think> across chunk boundaries
                             val content = delta?.content
                             if (!content.isNullOrEmpty()) {
-                                if (content.contains("<think>")) {
-                                    val parts = content.split("<think>")
-                                    if (parts[0].isNotEmpty()) {
-                                        fullAccumulatedText.append(parts[0])
-                                        tokenCount++
-                                        emit(SwiffleAiStreamEvent.Token(parts[0]))
-                                    }
-                                    if (parts.size > 1 && parts[1].isNotEmpty()) {
-                                        emit(SwiffleAiStreamEvent.Thinking(parts[1]))
-                                    }
-                                } else if (content.contains("</think>")) {
-                                    val parts = content.split("</think>")
-                                    if (parts[0].isNotEmpty()) {
-                                        emit(SwiffleAiStreamEvent.Thinking(parts[0]))
-                                    }
-                                    if (parts.size > 1 && parts[1].isNotEmpty()) {
-                                        fullAccumulatedText.append(parts[1])
-                                        tokenCount++
-                                        emit(SwiffleAiStreamEvent.Token(parts[1]))
-                                    }
-                                } else {
-                                    fullAccumulatedText.append(content)
+                                pendingThinking.clear()
+                                pendingTokens.clear()
+                                splitter.processChunk(
+                                    chunk = content,
+                                    onThinking = { pendingThinking.add(it) },
+                                    onToken = { pendingTokens.add(it) }
+                                )
+                                for (thought in pendingThinking) {
+                                    emit(SwiffleAiStreamEvent.Thinking(thought))
+                                }
+                                for (tok in pendingTokens) {
+                                    fullAccumulatedText.append(tok)
                                     tokenCount++
-                                    emit(SwiffleAiStreamEvent.Token(content))
+                                    emit(SwiffleAiStreamEvent.Token(tok))
                                 }
                             }
                         } catch (_: Exception) {
@@ -140,6 +136,21 @@ class PollinationsApiClient(
                     }
                 }
                 line = reader.readLine()
+            }
+
+            pendingThinking.clear()
+            pendingTokens.clear()
+            splitter.flush(
+                onThinking = { pendingThinking.add(it) },
+                onToken = { pendingTokens.add(it) }
+            )
+            for (thought in pendingThinking) {
+                emit(SwiffleAiStreamEvent.Thinking(thought))
+            }
+            for (tok in pendingTokens) {
+                fullAccumulatedText.append(tok)
+                tokenCount++
+                emit(SwiffleAiStreamEvent.Token(tok))
             }
 
             val elapsedMs = System.currentTimeMillis() - startTimeMs

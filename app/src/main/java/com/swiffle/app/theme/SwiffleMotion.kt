@@ -15,94 +15,98 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntOffset
 
 /**
  * ══════════════════════════════════════════════════════════════════════════════
- *  SWIFFLE MOTION SYSTEM — MATERIAL 3 EXPRESSIVE UI FLAGSHIP ARCHITECTURE
+ *  SWIFFLE MOTION SYSTEM — MATERIAL 3 EXPRESSIVE UI (v1.1 GUIDELINES)
  * ══════════════════════════════════════════════════════════════════════════════
  *
- * Implements Google's official May 2025 Material 3 Expressive motion specifications:
- * - Dual-domain physics: Spatial springs (with kinetic settle) + Effects springs (clean zero-overshoot)
- * - Exact cubic bezier conversion curves for frame-isolated RenderThread execution
- * - The 6 canonical transition archetypes (Container Transform, Shared Axis Z, Lateral, Top-Level, Sheets)
- * - Zero ghosting: Outgoing screens cleanly dissolve before incoming screens reach full opacity
+ * Implements the Design System v1.1 Section 2.7 Motion specifications:
+ * - Spatial Fast (stiffness 800, damping 0.65): Switches, buttons, chips, step dots
+ * - Spatial Default (stiffness 380, damping 0.80): Shared-Axis Z depth scale, cards, menus
+ * - Spatial Slow (stiffness 200, damping 0.80): Full-screen top-level dissolves
+ * - Effects Fast/Default (stiffness 1600 / 800, damping 1.0): Opacity & color (zero overshoot)
+ * - Strictly animates transform (scale/translation) and opacity on RenderThread for 60/120fps.
  */
 object SwiffleMotion {
 
-    // ── 1. M3 Expressive Physics Springs ──────────────────────────────────────
+    // ── 1. M3 Expressive Dual-Domain Physics Springs (Section 2.7) ────────────
+
     /**
-     * Expressive Default Spatial Spring:
-     * Used for bounds expansion, card scales, and spatial transforms.
-     * Features subtle kinetic energy with a silky, non-jarring settling response.
+     * Spatial Fast Spring (stiffness = 800f, damping = 0.65f):
+     * Used for switches, buttons, segmented sliders, and morphing step indicators.
+     */
+    val SpringSpatialFast: SpringSpec<Float> = spring(
+        dampingRatio = 0.65f,
+        stiffness = 800f
+    )
+
+    /**
+     * Spatial Default Spring (stiffness = 380f, damping = 0.80f):
+     * Used for Shared-Axis Z depth transitions, cards, sheets, and menus.
      */
     val SpringSpatial: SpringSpec<Float> = spring(
         dampingRatio = 0.80f,
-        stiffness = 420f
+        stiffness = 380f
     )
 
-    val SpringSpatialOffset: SpringSpec<androidx.compose.ui.unit.IntOffset> = spring(
+    val SpringSpatialOffset: SpringSpec<IntOffset> = spring(
         dampingRatio = 0.80f,
-        stiffness = 420f
+        stiffness = 380f
     )
 
     /**
-     * Expressive Fast Effects Spring:
-     * Used exclusively for Alpha/Opacity, Color blending, and Scrims.
-     * Strict DampingRatioNoBouncy (1.0f) to prevent illegal opacity overshoot (> 100% or < 0%).
+     * Spatial Slow Spring (stiffness = 200f, damping = 0.80f):
+     * Used for full-screen workspace entry dissolves.
+     */
+    val SpringSpatialSlow: SpringSpec<Float> = spring(
+        dampingRatio = 0.80f,
+        stiffness = 200f
+    )
+
+    /**
+     * Effects Fast Spring (stiffness = 1600f, damping = 1.0f):
+     * Used exclusively for Alpha/Opacity, Color blending, and Scrims (zero overshoot).
      */
     val SpringEffects: SpringSpec<Float> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = 550f
+        stiffness = 1600f
     )
 
     /**
      * Expressive Tactile Spring:
-     * Subtle energetic pop for buttons, morphic FAB speed-dial, and micro-press states.
+     * Subtle energetic pop for buttons and micro-press states.
      */
     val SpringTactile: SpringSpec<Float> = spring(
-        dampingRatio = 0.70f,
-        stiffness = 650f
+        dampingRatio = 0.68f,
+        stiffness = 750f
     )
 
     // ── 2. Official Material 3 Easing Curves (Cubic Beziers) ─────────────────
-    /**
-     * Standard M3 Emphasized Decelerate (fast initial acceleration, gentle settling).
-     * Token: md.sys.motion.easing.emphasized.decelerate
-     */
     val EmphasizedDecelerate: Easing = CubicBezierEasing(0.05f, 0.70f, 0.10f, 1.0f)
-
-    /**
-     * Standard M3 Emphasized Accelerate (rapid exit with subtle snap).
-     * Token: md.sys.motion.easing.emphasized.accelerate
-     */
     val EmphasizedAccelerate: Easing = CubicBezierEasing(0.30f, 0.00f, 0.80f, 0.15f)
-
-    /**
-     * Standard M3 Emphasized Curve for continuous, non-interrupted loops.
-     * Token: md.sys.motion.easing.emphasized
-     */
     val Emphasized: Easing = CubicBezierEasing(0.20f, 0.00f, 0.00f, 1.0f)
-
-    /**
-     * M3 Standard Curve (utility / high-frequency interactions).
-     */
     val Standard: Easing = CubicBezierEasing(0.20f, 0.00f, 0.00f, 1.0f)
     val StandardDecelerate: Easing = CubicBezierEasing(0.00f, 0.00f, 0.20f, 1.0f)
     val StandardAccelerate: Easing = CubicBezierEasing(0.40f, 0.00f, 1.00f, 1.0f)
 
     // ── 3. Duration Tokens (Milliseconds) ────────────────────────────────────
-    const val DurationShort4 = 200
-    const val DurationMedium2 = 300
-    const val DurationMedium4 = 400
-    const val DurationLong2 = 500
+    const val DurationShort4 = 180
+    const val DurationMedium2 = 260
+    const val DurationMedium4 = 350
+    const val DurationLong2 = 450
 
-    // ── 4. Canonical Transition Archetypes ───────────────────────────────────
+    // Aliases mapped to M3 Expressive easing & duration tokens
+    val FluentDecelerate: Easing = EmphasizedDecelerate
+    val FluentAccelerate: Easing = EmphasizedAccelerate
+    const val FluentNormalDuration = DurationMedium2
+    const val FluentFastDuration = DurationShort4
+
+    // ── 4. Canonical M3 Expressive Transition Archetypes ─────────────────────
 
     /**
      * Pattern 1: Container Transform (Hero Card / File -> Full Canvas)
-     * Directly matches 'Container transform.mp4':
-     * - Incoming view scales gracefully up from 0.92f with spatial spring physics.
-     * - Outgoing content fades out rapidly in 150ms to eliminate visual text ghosting.
      */
     fun containerTransform(): ContentTransform {
         return (fadeIn(
@@ -121,40 +125,43 @@ object SwiffleMotion {
     }
 
     /**
-     * Pattern 2: Forward Shared Axis Z (Hierarchical Drill-Down)
-     * Directly matches 'Forward and backward - 1.mp4' through '5.mp4':
-     * - Incoming screen elevates from 0.94f up to 1.0f while fading in.
-     * - Outgoing screen scales to 1.04f while cleanly dissolving in 160ms.
+     * Pattern 2: Forward Shared Axis Z (Primary M3 Expressive Page-to-Page Transition)
+     * - Incoming screen elevates from 0.94f up to 1.0f using Spatial Default spring (stiffness 380, damping 0.8)
+     *   while fading in over 240ms.
+     * - Outgoing screen scales subtly to 1.04f while cleanly dissolving in 150ms (zero text ghosting).
+     * - Executes strictly on RenderThread via scale & alpha transforms for 60/120fps zero-lag motion.
      */
     fun sharedAxisZForward(): ContentTransform {
         return (fadeIn(
-            animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 240, easing = EmphasizedDecelerate)
         ) + scaleIn(
             initialScale = 0.94f,
             animationSpec = SpringSpatial
         )).togetherWith(
             fadeOut(
-                animationSpec = tween(durationMillis = 160, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 150, easing = EmphasizedAccelerate)
             ) + scaleOut(
                 targetScale = 1.04f,
                 animationSpec = SpringSpatial
             )
-        )
+        ).apply {
+            targetContentZIndex = 1f
+        }
     }
 
     /**
      * Pattern 2 (Reverse): Backward Shared Axis Z (Hierarchical Return)
-     * Returning screen scales down from 1.04f to 1.0f; departing view recedes to 0.94f.
+     * - Returning screen scales down from 1.04f to 1.0f; departing view recedes to 0.94f.
      */
     fun sharedAxisZBackward(): ContentTransform {
         return (fadeIn(
-            animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 240, easing = EmphasizedDecelerate)
         ) + scaleIn(
             initialScale = 1.04f,
             animationSpec = SpringSpatial
         )).togetherWith(
             fadeOut(
-                animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 160, easing = EmphasizedAccelerate)
             ) + scaleOut(
                 targetScale = 0.94f,
                 animationSpec = SpringSpatial
@@ -166,20 +173,16 @@ object SwiffleMotion {
 
     /**
      * Dedicated PDF Canvas Return Transition (Material 3 Seamless Return)
-     * Completely eliminates white flash / splash when closing a PDF:
-     * 1. Returning Home Screen gently scales in from 1.03f with smooth deceleration.
-     * 2. Exiting PDF canvas recedes slightly to 0.96f and holds opacity so it never exposes the underlying void.
-     * 3. Target Z-Index keeps the returning layer neatly layered over the exit surface.
      */
     fun pdfCanvasReturn(): ContentTransform {
         return (fadeIn(
-            animationSpec = tween(durationMillis = 280, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 260, easing = EmphasizedDecelerate)
         ) + scaleIn(
             initialScale = 1.03f,
             animationSpec = SpringSpatial
         )).togetherWith(
             fadeOut(
-                animationSpec = tween(durationMillis = 240, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 200, easing = EmphasizedAccelerate)
             ) + scaleOut(
                 targetScale = 0.96f,
                 animationSpec = SpringSpatial
@@ -190,115 +193,79 @@ object SwiffleMotion {
     }
 
     /**
-     * Pattern 3: Lateral Slide (Peer Tab Navigation: All Docs <-> Starred <-> Annotated)
-     * Directly matches 'Lateral 1.mp4' to '3.mp4':
-     * Directional horizontal slide without depth/scale distortion for 1:1 tactile alignment.
+     * Pattern 3: Expressive Step Lateral + Depth Transition (For Feature Tour Steps)
+     * Combines a subtle 14% horizontal spring glide with a 0.96f -> 1.0f depth scale.
      */
     fun lateralForward(): ContentTransform {
         return (slideInHorizontally(
-            initialOffsetX = { fullWidth -> (fullWidth * 0.25f).toInt() },
+            initialOffsetX = { fullWidth -> (fullWidth * 0.14f).toInt() },
             animationSpec = SpringSpatialOffset
+        ) + scaleIn(
+            initialScale = 0.96f,
+            animationSpec = SpringSpatial
         ) + fadeIn(
-            animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 220, easing = EmphasizedDecelerate)
         )).togetherWith(
             slideOutHorizontally(
-                targetOffsetX = { fullWidth -> (-fullWidth * 0.25f).toInt() },
+                targetOffsetX = { fullWidth -> (-fullWidth * 0.14f).toInt() },
                 animationSpec = SpringSpatialOffset
+            ) + scaleOut(
+                targetScale = 0.96f,
+                animationSpec = SpringSpatial
             ) + fadeOut(
-                animationSpec = tween(durationMillis = 150, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 140, easing = EmphasizedAccelerate)
             )
         )
     }
 
     fun lateralBackward(): ContentTransform {
         return (slideInHorizontally(
-            initialOffsetX = { fullWidth -> (-fullWidth * 0.25f).toInt() },
+            initialOffsetX = { fullWidth -> (-fullWidth * 0.14f).toInt() },
             animationSpec = SpringSpatialOffset
+        ) + scaleIn(
+            initialScale = 0.96f,
+            animationSpec = SpringSpatial
         ) + fadeIn(
-            animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 220, easing = EmphasizedDecelerate)
         )).togetherWith(
             slideOutHorizontally(
-                targetOffsetX = { fullWidth -> (fullWidth * 0.25f).toInt() },
+                targetOffsetX = { fullWidth -> (fullWidth * 0.14f).toInt() },
                 animationSpec = SpringSpatialOffset
+            ) + scaleOut(
+                targetScale = 0.96f,
+                animationSpec = SpringSpatial
             ) + fadeOut(
-                animationSpec = tween(durationMillis = 150, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 140, easing = EmphasizedAccelerate)
             )
         )
     }
 
     /**
      * Pattern 4: Top Level Fade Through (Splash -> Onboarding -> Home)
-     * Directly matches 'Top level.mp4' & 'Top level 1.mp4':
-     * Gentle scale-dissolve (0.97f -> 1.0f) with zero lateral panning, preventing disorientation.
      */
     fun scaleFadeThrough(): ContentTransform {
         return (fadeIn(
-            animationSpec = tween(durationMillis = DurationMedium2, easing = EmphasizedDecelerate)
+            animationSpec = tween(durationMillis = 260, easing = EmphasizedDecelerate)
         ) + scaleIn(
-            initialScale = 0.97f,
+            initialScale = 0.96f,
             animationSpec = SpringSpatial
         )).togetherWith(
             fadeOut(
-                animationSpec = tween(durationMillis = 180, easing = EmphasizedAccelerate)
+                animationSpec = tween(durationMillis = 160, easing = EmphasizedAccelerate)
             ) + scaleOut(
-                targetScale = 1.02f,
+                targetScale = 1.03f,
                 animationSpec = SpringSpatial
             )
         )
     }
 
-    // ── Windows 11 Fluent Design System Horizontal Page Transitions ─────────
-    val FluentDecelerate: Easing = CubicBezierEasing(0.0f, 0.0f, 0.0f, 1.0f)
-    val FluentAccelerate: Easing = CubicBezierEasing(1.0f, 0.0f, 1.0f, 1.0f)
-    const val FluentNormalDuration = 250
-    const val FluentFastDuration = 200
-
     /**
-     * Fluent Forward Navigation (Horizontal Push):
-     * - Incoming page slides in horizontally from the right (100% width) with Fade In.
-     * - Outgoing page slides out horizontally to the left (-100% width) with Fade Out.
+     * Forward & Backward aliases mapped to Shared-Axis Z for 60fps zero-lag M3 Expressive navigation
      */
-    fun horizontalForward(): ContentTransform {
-        return (slideInHorizontally(
-            initialOffsetX = { fullWidth -> fullWidth },
-            animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentDecelerate)
-        ) + fadeIn(
-            animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentDecelerate)
-        )).togetherWith(
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> -fullWidth },
-                animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentAccelerate)
-            ) + fadeOut(
-                animationSpec = tween(durationMillis = FluentFastDuration, easing = FluentAccelerate)
-            )
-        )
-    }
+    fun horizontalForward(): ContentTransform = sharedAxisZForward()
+    fun horizontalBackward(): ContentTransform = sharedAxisZBackward()
 
-    /**
-     * Fluent Backward Navigation (Horizontal Pop):
-     * - Incoming page slides in horizontally from the left (-100% width) with Fade In.
-     * - Outgoing page slides out horizontally to the right (100% width) with Fade Out.
-     */
-    fun horizontalBackward(): ContentTransform {
-        return (slideInHorizontally(
-            initialOffsetX = { fullWidth -> -fullWidth },
-            animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentDecelerate)
-        ) + fadeIn(
-            animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentDecelerate)
-        )).togetherWith(
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = FluentNormalDuration, easing = FluentAccelerate)
-            ) + fadeOut(
-                animationSpec = tween(durationMillis = FluentFastDuration, easing = FluentAccelerate)
-            )
-        )
-    }
-
-    /**
-     * Universal page transition spec that can be directly passed to `AnimatedContent(transitionSpec = ...)`:
-     */
     val pageTransitionSpec: AnimatedContentTransitionScope<*>.() -> ContentTransform = {
-        horizontalForward()
+        sharedAxisZForward()
     }
 }

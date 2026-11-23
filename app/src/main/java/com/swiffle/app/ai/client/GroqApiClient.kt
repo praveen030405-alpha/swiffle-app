@@ -2,6 +2,7 @@ package com.swiffle.app.ai.client
 
 import com.swiffle.app.ai.AiChatMessage
 import com.swiffle.app.ai.AiChatRequest
+import com.swiffle.app.ai.SseThinkTagSplitter
 import com.swiffle.app.ai.StreamChunkResponse
 import com.swiffle.app.ai.SwiffleAiConfig
 import com.swiffle.app.ai.SwiffleAiException
@@ -118,8 +119,16 @@ class GroqApiClient(
 
             val body = response.body ?: throw SwiffleAiException.StreamInterrupted("Empty response body from Groq")
             val reader = BufferedReader(InputStreamReader(body.byteStream(), Charsets.UTF_8))
+            emit(SwiffleAiStreamEvent.StatusUpdate("Stream connected. Waiting for the model to begin responding."))
+
             val fullAccumulatedText = StringBuilder()
             var tokenCount = 0
+            var reportedPromptTokens = 0
+            var reportedCompletionTokens = 0
+            var reportedTotalTokens = 0
+            val splitter = SseThinkTagSplitter()
+            val pendingThinking = mutableListOf<String>()
+            val pendingTokens = mutableListOf<String>()
 
             var line: String? = reader.readLine()
             while (line != null) {
@@ -134,21 +143,38 @@ class GroqApiClient(
                     if (dataContent.isNotEmpty()) {
                         try {
                             val chunk = json.decodeFromString(StreamChunkResponse.serializer(), dataContent)
+                            chunk.usage?.let { u ->
+                                if (u.promptTokens > 0) reportedPromptTokens = u.promptTokens
+                                if (u.completionTokens > 0) reportedCompletionTokens = u.completionTokens
+                                if (u.totalTokens > 0) reportedTotalTokens = u.totalTokens
+                            }
                             val choice = chunk.choices.firstOrNull()
                             val delta = choice?.delta
 
                             // Check for reasoning content (thinking models)
-                            val reasoning = delta?.reasoningContent
+                            val reasoning = delta?.reasoningContent?.ifBlank { null } ?: delta?.reasoning?.ifBlank { null }
                             if (!reasoning.isNullOrEmpty()) {
                                 emit(SwiffleAiStreamEvent.Thinking(reasoning))
                             }
 
-                            // Check for standard text content
-                            val token = delta?.content
-                            if (!token.isNullOrEmpty()) {
-                                fullAccumulatedText.append(token)
-                                tokenCount++
-                                emit(SwiffleAiStreamEvent.Token(token))
+                            // Check for standard text content (with <think> tag separation)
+                            val tokenChunk = delta?.content
+                            if (!tokenChunk.isNullOrEmpty()) {
+                                pendingThinking.clear()
+                                pendingTokens.clear()
+                                splitter.processChunk(
+                                    chunk = tokenChunk,
+                                    onThinking = { pendingThinking.add(it) },
+                                    onToken = { pendingTokens.add(it) }
+                                )
+                                for (thought in pendingThinking) {
+                                    emit(SwiffleAiStreamEvent.Thinking(thought))
+                                }
+                                for (tok in pendingTokens) {
+                                    fullAccumulatedText.append(tok)
+                                    tokenCount++
+                                    emit(SwiffleAiStreamEvent.Token(tok))
+                                }
                             }
                         } catch (_: Exception) {
                             // Non-fatal: bypass malformed SSE frames
@@ -158,13 +184,36 @@ class GroqApiClient(
                 line = reader.readLine()
             }
 
+            pendingThinking.clear()
+            pendingTokens.clear()
+            splitter.flush(
+                onThinking = { pendingThinking.add(it) },
+                onToken = { pendingTokens.add(it) }
+            )
+            for (thought in pendingThinking) {
+                emit(SwiffleAiStreamEvent.Thinking(thought))
+            }
+            for (tok in pendingTokens) {
+                fullAccumulatedText.append(tok)
+                tokenCount++
+                emit(SwiffleAiStreamEvent.Token(tok))
+            }
+
             val elapsedMs = System.currentTimeMillis() - startTimeMs
+            val estimatedPrompt = (messages.sumOf { it.content.length } / 4).coerceAtLeast(1)
+            val estimatedOutput = (fullAccumulatedText.length / 4).coerceAtLeast(tokenCount)
+            val finalPrompt = if (reportedPromptTokens > 0) reportedPromptTokens else estimatedPrompt
+            val finalOutput = if (reportedCompletionTokens > 0) reportedCompletionTokens else estimatedOutput
+            val finalTotal = if (reportedTotalTokens > 0) reportedTotalTokens else (finalPrompt + finalOutput)
             emit(
                 SwiffleAiStreamEvent.Completed(
                     fullText = fullAccumulatedText.toString(),
                     engineUsed = "Groq ($model)",
                     latencyMs = elapsedMs,
-                    totalTokens = tokenCount
+                    totalTokens = finalTotal,
+                    promptTokens = finalPrompt,
+                    outputTokens = finalOutput,
+                    modelId = model
                 )
             )
 

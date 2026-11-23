@@ -18,20 +18,20 @@ enum class ThemeMode(val key: String, val displayName: String, val subtitle: Str
 
     companion object {
         fun fromKey(key: String?): ThemeMode {
-            return entries.firstOrNull { it.key == key } ?: SYSTEM
+            return entries.firstOrNull { it.key == key } ?: DARK
         }
     }
 }
 
 /**
- * Reactive Theme Manager for Swiffle PDF.
- * Instant, frame-0 theme switching without Activity restarts or UI flashes.
+ * Reactive Theme Manager for Swiffle.
+ * Defaults to Dark mode (#000000 True Black Void) for seamless transition from Splash/Onboarding.
  */
 object ThemeManager {
     private const val PREFS_NAME = "OrigamiPrefs"
-    private const val KEY_THEME_MODE = "app_theme_mode"
+    private const val KEY_THEME_MODE = "app_theme_mode_v2_dark_void"
 
-    private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
+    private val _themeMode = MutableStateFlow(ThemeMode.DARK)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
     private var isInitialized = false
@@ -39,7 +39,7 @@ object ThemeManager {
     fun init(context: Context) {
         if (!isInitialized) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val saved = prefs.getString(KEY_THEME_MODE, "light")
+            val saved = prefs.getString(KEY_THEME_MODE, "dark")
             _themeMode.value = ThemeMode.fromKey(saved)
             isInitialized = true
         }

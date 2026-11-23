@@ -1,80 +1,194 @@
 package com.swiffle.app.theme
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// ── Google Material 3 / Play Store Pro Design Tokens ───────────────────────
-// Primary Brand Colors (Google Play / Origami Red Signature)
-val OrigamiRed          = Color(0xFFE53935)
-val OrigamiRedDim       = Color(0xFFB71C1C)
-val OrigamiRedSubtle    = Color(0xFF2C0B0E)
+// ══════════════════════════════════════════════════════════════════════════════
+//  SWIFFLE DESIGN SYSTEM v1.1 — MAROON (#800000) PRIMITIVE & SEMANTIC TOKENS
+// ══════════════════════════════════════════════════════════════════════════════
 
-// Dark Mode Natural Accent Tones (Deeper, grounded, organic tones without pastel wash)
-val DarkModeRedNatural         = Color(0xFFC62828) // Grounded deep red
-val DarkModeRedContainer       = Color(0xFF3B0D11) // Deep dark crimson container
-val DarkModeRedOnContainer     = Color(0xFFFCA5A5) // Natural soft red
+// 1. Primitive Maroon Tonal Scale (Section 2.1)
+val Maroon900 = Color(0xFF3D0000)
+val Maroon800 = Color(0xFF590000)
+val Maroon700 = Color(0xFF6B0000)
+val Maroon600 = Color(0xFF800000) // Brand Primary (Identical in Light & Dark)
+val Maroon500 = Color(0xFF9B1C1C)
+val Maroon400 = Color(0xFFB84545)
+val Maroon300 = Color(0xFFD9807F) // Dark Mode Primary Accent (~7:1 on Black)
+val Maroon200 = Color(0xFFEBB0AF)
+val Maroon100 = Color(0xFFF7DAD9) // Light Mode Primary Container / Dark OnPrimaryContainer
+val Maroon50  = Color(0xFFFDF1F0)
 
-// Google Play Store Signature Accents
-val GoogleBlue          = Color(0xFF0B57D0)
-val GoogleBlueLight     = Color(0xFFD3E3FD)
-val GoogleBlueSubtle    = Color(0xFF041E49)
+// 2. Semantic Light Mode Tokens (Section 2.1)
+val BgPageLight               = Color(0xFFFFFFFF)
+val BgSurfaceLight            = Color(0xFFFFFFFF)
+val SurfaceContainerLowLight  = Color(0xFFFAF6F6)
+val SurfaceContainerLight     = Color(0xFFF4EEEE)
+val SurfaceContainerHighLight = Color(0xFFEDE6E6)
+val SecondaryContainerLight   = Color(0xFFF1E4E3)
+val TextPrimaryLight          = Color(0xFF1C1B1B)
+val TextSecondaryLight        = Color(0xFF5F5757)
+val TextDisabledLight         = Color(0xFFA39B9B)
+val BorderDefaultLight        = Color(0xFFD8CECE)
+val BorderFocusLight          = Color(0xFF800000)
 
-// Dark Mode Natural Blue Accents
-val DarkModeBlueNatural        = Color(0xFF1E60D5) // Natural rich Google Blue
-val DarkModeBlueSurface        = Color(0xFF11387D) // Deep rich navy container
-val DarkModeBlueOnSurface      = Color(0xFFBFDBFE) // Natural soft blue text
-val GoogleGreen         = Color(0xFF146C2E)
-val GoogleGreenLight    = Color(0xFFC4EED0)
-val GoogleGreenSubtle   = Color(0xFF072711)
-val GoogleYellow        = Color(0xFFE37400)
-val GoogleYellowLight   = Color(0xFFFFDDB3)
+// 3. Semantic Dark Mode Tokens (Section 2.1 — True Black Base)
+val BgPageDark                = Color(0xFF000000)
+val BgSurfaceDark             = Color(0xFF0D0D0D)
+val SurfaceContainerLowDark   = Color(0xFF121212)
+val SurfaceContainerDark      = Color(0xFF161616)
+val SurfaceContainerHighDark  = Color(0xFF1F1F1F)
+val SecondaryContainerDark    = Color(0xFF3A2A2A)
+val TextPrimaryDark           = Color(0xFFF5F5F5)
+val TextSecondaryDark         = Color(0xFFB8B8B8)
+val TextDisabledDark          = Color(0xFF6B6B6B)
+val BorderDefaultDark         = Color(0xFF2E2E2E)
+val BorderFocusDark           = Color(0xFFD9807F)
 
-// Material 3 & WinUI 3 Tonal Surface Architecture (Dark Mode — Deep Dark Void Black)
-val VoidBlack           = Color(0xFF000000) // Deep Dark Void Black Canvas Base
-val SurfaceDark900      = Color(0xFF000000) // Base dark background (Container 0) — Deep Dark Void Black
-val SurfaceDark800      = Color(0xFF0A0A0A) // Surface Container Low (Cards / Shelves)
-val SurfaceDark700      = Color(0xFF121212) // Surface Container (Active items, dialogs)
-val SurfaceDark600      = Color(0xFF1A1A1A) // Surface Container High (Modals, sheets)
-val SurfaceDark500      = Color(0xFF242424) // Surface Container Highest (Dividers, borders)
+// 4. Semantic Status Tokens (Light / Dark)
+val StatusSuccessLight        = Color(0xFF2E7D32)
+val StatusSuccessDark         = Color(0xFF66BB6A)
+val StatusWarningLight        = Color(0xFFED6C02)
+val StatusWarningDark         = Color(0xFFFFB74D)
+val StatusErrorLight          = Color(0xFFD32F2F)
+val StatusErrorDark           = Color(0xFFFF6B6B)
+val StatusInfoLight           = Color(0xFF0277BD)
+val StatusInfoDark            = Color(0xFF4FC3F7)
 
-// Dark Mode Typography Tones
-val TextPrimaryDark     = Color(0xFFF5F5F5) // High emphasis 95%
-val TextSecondaryDark   = Color(0xFFB3B3B3) // Medium emphasis 70%
-val TextMutedDark       = Color(0xFF7A7A7A) // Disabled / hint 45%
+@Immutable
+data class SwiffleSemanticColors(
+    val bgPage: Color,
+    val bgSurface: Color,
+    val surfaceContainerLow: Color,
+    val surfaceContainer: Color,
+    val surfaceContainerHigh: Color,
+    val primary: Color,
+    val onPrimary: Color,
+    val primaryContainer: Color,
+    val onPrimaryContainer: Color,
+    val primaryAccent: Color,
+    val secondaryContainer: Color,
+    val onSecondaryContainer: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textDisabled: Color,
+    val borderDefault: Color,
+    val borderFocus: Color,
+    val success: Color,
+    val warning: Color,
+    val error: Color,
+    val info: Color,
+    val isDark: Boolean
+)
 
-// Material 3 Tonal Surface Architecture (Light Mode — Swiffle Alabaster / Grey-White Canvas)
-val SurfaceLight100     = Color(0xFFF4F5F8) // Base light grey mixed with white
-val SurfaceLight200     = Color(0xFFFFFFFF) // Surface Container Low (Floating Pure White Cards)
-val SurfaceLight300     = Color(0xFFECEEF3) // Surface Container (Pills / Inputs / Search Bar)
-val SurfaceLight400     = Color(0xFFE2E5EB) // Surface Container High (Border Strokes)
-val SurfaceLight500     = Color(0xFFD5D8E0) // Dividers & Hairlines
+val LightSwiffleTokens = SwiffleSemanticColors(
+    bgPage               = BgPageLight,
+    bgSurface            = BgSurfaceLight,
+    surfaceContainerLow  = SurfaceContainerLowLight,
+    surfaceContainer     = SurfaceContainerLight,
+    surfaceContainerHigh = SurfaceContainerHighLight,
+    primary              = Maroon600,
+    onPrimary            = Color(0xFFFFFFFF),
+    primaryContainer     = Maroon100,
+    onPrimaryContainer   = Maroon900,
+    primaryAccent        = Maroon600,
+    secondaryContainer   = SecondaryContainerLight,
+    onSecondaryContainer = TextPrimaryLight,
+    textPrimary          = TextPrimaryLight,
+    textSecondary        = TextSecondaryLight,
+    textDisabled         = TextDisabledLight,
+    borderDefault        = BorderDefaultLight,
+    borderFocus          = BorderFocusLight,
+    success              = StatusSuccessLight,
+    warning              = StatusWarningLight,
+    error                = StatusErrorLight,
+    info                 = StatusInfoLight,
+    isDark               = false
+)
 
-// Swiffle Brand Palette Tokens
-val SwiffleNavyPrimary  = Color(0xFF1A427C) // Refined Royal Navy Blue (Balanced, rich, not pitch dark)
-val SwiffleCobaltAccent = Color(0xFF2563EB) // Electric Cobalt Blue
-val SwiffleIceBlue      = Color(0xFFD3DEF1) // Frosted Glacial Blue
+val DarkSwiffleTokens = SwiffleSemanticColors(
+    bgPage               = BgPageDark,
+    bgSurface            = BgSurfaceDark,
+    surfaceContainerLow  = SurfaceContainerLowDark,
+    surfaceContainer     = SurfaceContainerDark,
+    surfaceContainerHigh = SurfaceContainerHighDark,
+    primary              = Maroon600,
+    onPrimary            = Color(0xFFFFFFFF),
+    primaryContainer     = Maroon800,
+    onPrimaryContainer   = Maroon100,
+    primaryAccent        = Maroon300, // #D9807F (~7:1 contrast on black)
+    secondaryContainer   = SecondaryContainerDark,
+    onSecondaryContainer = TextPrimaryDark,
+    textPrimary          = TextPrimaryDark,
+    textSecondary        = TextSecondaryDark,
+    textDisabled         = TextDisabledDark,
+    borderDefault        = BorderDefaultDark,
+    borderFocus          = BorderFocusDark,
+    success              = StatusSuccessDark,
+    warning              = StatusWarningDark,
+    error                = StatusErrorDark,
+    info                 = StatusInfoDark,
+    isDark               = true
+)
 
-// Light Mode Typography Tones (High-legibility Obsidian / Slate)
-val TextPrimaryLight    = Color(0xFF0F172A) // Rich Charcoal Obsidian
-val TextSecondaryLight  = Color(0xFF475569) // Refined Cool Slate
-val TextMutedLight      = Color(0xFF64748B) // Medium Slate Hint
+val LocalSwiffleColors = staticCompositionLocalOf { LightSwiffleTokens }
 
-// Semantic Accents
-val SemanticSuccess     = Color(0xFF198754)
-val SemanticWarning     = Color(0xFFE65100)
-val SemanticError       = Color(0xFFBA1A1A)
-val SemanticInfo        = Color(0xFF0B57D0)
+// ── Compatibility Aliases Mapped to Maroon v1.1 Tokens ─────────────────────
+val OrigamiRed             = Maroon600
+val OrigamiRedDim          = Maroon700
+val OrigamiRedSubtle       = Maroon900
 
-// Excel & Converter Accents
-val ExcelGreen          = Color(0xFF107C41)
-val ExcelGreenLight     = Color(0xFF185ABD)
-val ConvertBlue         = Color(0xFF0B57D0)
-val ConvertPurple       = Color(0xFF6750A4)
-val ConvertAmber        = Color(0xFFD97706)
+val DarkModeRedNatural     = StatusErrorDark
+val DarkModeRedContainer   = Maroon800
+val DarkModeRedOnContainer = Maroon100
 
-// Legacy compatibility
-val Purple80            = Color(0xFFD0BCFF)
-val PurpleGrey80        = Color(0xFFCCC2DC)
-val Pink80              = Color(0xFFEFB8C8)
-val Purple40            = Color(0xFF6650a4)
-val PurpleGrey40        = Color(0xFF625b71)
-val Pink40              = Color(0xFF7D5260)
+val GoogleBlue             = Maroon600
+val GoogleBlueLight        = Maroon100
+val GoogleBlueSubtle       = Maroon900
+
+val DarkModeBlueNatural    = Maroon300
+val DarkModeBlueSurface    = Maroon800
+val DarkModeBlueOnSurface  = Maroon100
+val GoogleGreen            = StatusSuccessLight
+val GoogleGreenLight       = Color(0xFFC4EED0)
+val GoogleGreenSubtle      = Color(0xFF072711)
+val GoogleYellow           = StatusWarningLight
+val GoogleYellowLight      = Color(0xFFFFDDB3)
+
+val VoidBlack              = BgPageDark
+val SurfaceDark900         = BgPageDark
+val SurfaceDark800         = SurfaceContainerLowDark
+val SurfaceDark700         = SurfaceContainerDark
+val SurfaceDark600         = SurfaceContainerHighDark
+val SurfaceDark500         = BorderDefaultDark
+val TextMutedDark          = TextDisabledDark
+
+val SurfaceLight100        = BgPageLight
+val SurfaceLight200        = SurfaceContainerLowLight
+val SurfaceLight300        = SurfaceContainerLight
+val SurfaceLight400        = SurfaceContainerHighLight
+val SurfaceLight500        = BorderDefaultLight
+val TextMutedLight         = TextDisabledLight
+
+val SwiffleNavyPrimary     = Maroon600
+val SwiffleCobaltAccent    = Maroon500
+val SwiffleIceBlue         = Maroon100
+
+val SemanticSuccess        = StatusSuccessLight
+val SemanticWarning        = StatusWarningLight
+val SemanticError          = StatusErrorLight
+val SemanticInfo           = StatusInfoLight
+
+val ExcelGreen             = Color(0xFF107C41)
+val ExcelGreenLight        = Color(0xFF185ABD)
+val ConvertBlue            = Maroon600
+val ConvertPurple          = Maroon500
+val ConvertAmber           = StatusWarningLight
+
+val Purple80               = Maroon200
+val PurpleGrey80           = Maroon100
+val Pink80                 = Maroon200
+val Purple40               = Maroon600
+val PurpleGrey40           = Maroon700
+val Pink40                 = Maroon500
