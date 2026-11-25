@@ -19,6 +19,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,6 +64,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -702,6 +706,18 @@ fun SwiffleAiChatScreen(
     }?.id
     val rootBgColor = if (isDark) Color(0xFF000000) else tokens.bgVoid
 
+    val isAnyHeaderMenuOpen = modelMenuExpanded || overflowMenuExpanded
+    val liquidBackdropBlurDp by animateDpAsState(
+        targetValue = if (isAnyHeaderMenuOpen) 16.dp else 0.dp,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "liquid_glass_backdrop_blur"
+    )
+    val liquidScrimAlpha by animateFloatAsState(
+        targetValue = if (isAnyHeaderMenuOpen) (if (isDark) 0.22f else 0.10f) else 0f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        label = "liquid_glass_scrim_alpha"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -724,10 +740,21 @@ fun SwiffleAiChatScreen(
             )
         }
 
-        // 1. Full-Bleed Scrollable Chat Stream / Welcome Hero (glides beneath transparent header & floating dock)
+        // 1. Full-Bleed Scrollable Chat Stream / Welcome Hero (glides beneath transparent header & floating dock;
+        //    real GPU-blurred on Android 12+ when Liquid Glass dropdowns open)
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .then(
+                    if (liquidBackdropBlurDp > 0.5.dp) {
+                        Modifier.blur(
+                            radius = liquidBackdropBlurDp,
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .widthIn(max = 640.dp)
                 .align(Alignment.Center)
@@ -818,11 +845,15 @@ fun SwiffleAiChatScreen(
                 )
         )
 
-        // 4. Tap-outside scrim to close open Glassmorphism dropdowns smoothly
+        // 4. Tap-outside optical scrim to close open Liquid Glass dropdowns smoothly
         if (modelMenuExpanded || overflowMenuExpanded) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(
+                        if (isDark) Color.Black.copy(alpha = liquidScrimAlpha)
+                        else Color.White.copy(alpha = liquidScrimAlpha)
+                    )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

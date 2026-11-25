@@ -377,49 +377,81 @@ internal fun ObsidianModelSelectorDropdown(
                 animationSpec = tween(150, easing = FluentAccelerate)
             )
     ) {
-        val panelShape = RoundedCornerShape(22.dp)
-        // Pure glassmorphism matching the Header Model Display pill
-        val panelGlassFill = remember(tokens.isDark) {
+        val panelShape = RoundedCornerShape(24.dp)
+        // Liquid Glass translucent refractive surface layered over the blurred chat backdrop
+        val liquidGlassFill = remember(tokens.isDark) {
             if (tokens.isDark) {
                 Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.13f),
-                        Color.White.copy(alpha = 0.05f)
-                    )
+                    0.0f to Color.White.copy(alpha = 0.20f),
+                    0.28f to Color.White.copy(alpha = 0.09f),
+                    0.72f to Color.White.copy(alpha = 0.045f),
+                    1.0f to Color.White.copy(alpha = 0.11f)
                 )
             } else {
                 Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.86f),
-                        Color(0xFFF3ECEF).copy(alpha = 0.74f)
-                    )
+                    0.0f to Color.White.copy(alpha = 0.84f),
+                    0.40f to Color(0xFFFDF8FA).copy(alpha = 0.72f),
+                    1.0f to Color(0xFFF3E9ED).copy(alpha = 0.78f)
                 )
             }
         }
-        val panelScrimTint = if (tokens.isDark) Color.Black.copy(alpha = 0.28f) else Color.Transparent
-        val panelBorder = remember(tokens.isDark) {
+        val liquidDepthVeil = if (tokens.isDark) {
+            Color(0xFF0A070C).copy(alpha = 0.34f)
+        } else {
+            Color.White.copy(alpha = 0.14f)
+        }
+        val liquidRimBorder = remember(tokens.isDark) {
             Brush.linearGradient(
                 listOf(
-                    if (tokens.isDark) Color.White.copy(alpha = 0.26f) else Color.Black.copy(alpha = 0.12f),
-                    tokens.accentRose.copy(alpha = if (tokens.isDark) 0.24f else 0.16f),
-                    if (tokens.isDark) Color.White.copy(alpha = 0.09f) else Color.Black.copy(alpha = 0.06f)
+                    if (tokens.isDark) Color.White.copy(alpha = 0.44f) else Color.White.copy(alpha = 0.92f),
+                    tokens.accentRose.copy(alpha = if (tokens.isDark) 0.32f else 0.20f),
+                    if (tokens.isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
+                    if (tokens.isDark) Color.White.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.72f)
                 )
             )
         }
 
         Column(
             modifier = Modifier
-                .widthIn(min = 256.dp, max = 304.dp)
+                .widthIn(min = 264.dp, max = 312.dp)
                 .shadow(
-                    elevation = if (tokens.isDark) 14.dp else 8.dp,
+                    elevation = if (tokens.isDark) 18.dp else 10.dp,
                     shape = panelShape,
-                    ambientColor = Color.Black.copy(alpha = 0.34f),
-                    spotColor = Color.Black.copy(alpha = 0.34f)
+                    ambientColor = Color.Black.copy(alpha = 0.38f),
+                    spotColor = Color.Black.copy(alpha = 0.38f)
                 )
                 .clip(panelShape)
-                .background(panelScrimTint)
-                .background(panelGlassFill)
-                .border(0.9.dp, panelBorder, panelShape)
+                .background(liquidDepthVeil)
+                .background(liquidGlassFill)
+                .drawBehind {
+                    // Top-left liquid glass caustic refraction sheen
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = if (tokens.isDark) 0.18f else 0.55f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.18f, 0f),
+                            radius = size.width * 0.78f
+                        ),
+                        center = Offset(size.width * 0.18f, 0f),
+                        radius = size.width * 0.78f
+                    )
+                    // Bottom-right subtle rose chromatic bounce
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                tokens.accentRose.copy(alpha = if (tokens.isDark) 0.14f else 0.08f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.88f, size.height * 0.96f),
+                            radius = size.width * 0.65f
+                        ),
+                        center = Offset(size.width * 0.88f, size.height * 0.96f),
+                        radius = size.width * 0.65f
+                    )
+                }
+                .border(1.dp, liquidRimBorder, panelShape)
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -427,8 +459,8 @@ internal fun ObsidianModelSelectorDropdown(
                 val isSelected = tier == selectedModel
                 val rowBg by animateColorAsState(
                     targetValue = if (isSelected) {
-                        if (tokens.isDark) Color.White.copy(alpha = 0.12f)
-                        else Color.Black.copy(alpha = 0.06f)
+                        if (tokens.isDark) Color.White.copy(alpha = 0.15f)
+                        else Color.White.copy(alpha = 0.68f)
                     } else {
                         Color.Transparent
                     },
@@ -437,8 +469,8 @@ internal fun ObsidianModelSelectorDropdown(
                 )
                 val rowBorder by animateColorAsState(
                     targetValue = if (isSelected) {
-                        if (tokens.isDark) Color.White.copy(alpha = 0.24f)
-                        else Color.Black.copy(alpha = 0.14f)
+                        if (tokens.isDark) Color.White.copy(alpha = 0.34f)
+                        else tokens.accentRose.copy(alpha = 0.24f)
                     } else {
                         Color.Transparent
                     },
@@ -446,14 +478,14 @@ internal fun ObsidianModelSelectorDropdown(
                     label = "model_row_border_${tier.id}"
                 )
 
-                val rowShape = RoundedCornerShape(15.dp)
+                val rowShape = RoundedCornerShape(16.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 56.dp)
                         .clip(rowShape)
                         .background(rowBg)
-                        .border(0.8.dp, rowBorder, rowShape)
+                        .border(0.85.dp, rowBorder, rowShape)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(color = tokens.textPrimary.copy(alpha = 0.14f)),
@@ -467,7 +499,7 @@ internal fun ObsidianModelSelectorDropdown(
                         Text(
                             text = tier.displayName,
                             fontFamily = ClaudeSerif,
-                            fontSize = 15.sp,
+                            fontSize = 15.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = tokens.textPrimary
                         )
@@ -504,7 +536,7 @@ internal fun ObsidianModelSelectorDropdown(
 }
 
 /**
- * Fluent-animated Glassmorphic 3-Dot Overflow Popover Menu.
+ * Fluent-animated Liquid Glass 3-Dot Overflow Popover Menu.
  * Logical order: New Chat -> Chat History -> Usage & Limits.
  */
 @Composable
@@ -541,42 +573,61 @@ internal fun ObsidianOverflowMenuDropdown(
                 animationSpec = tween(150, easing = FluentAccelerate)
             )
     ) {
-        val panelShape = RoundedCornerShape(20.dp)
-        val panelBg = if (tokens.isDark) {
-            Brush.verticalGradient(
-                listOf(
-                    Color(0xFF1A151B).copy(alpha = 0.90f),
-                    Color(0xFF0E0B10).copy(alpha = 0.94f)
+        val panelShape = RoundedCornerShape(22.dp)
+        val liquidGlassFill = remember(tokens.isDark) {
+            if (tokens.isDark) {
+                Brush.verticalGradient(
+                    0.0f to Color.White.copy(alpha = 0.18f),
+                    0.32f to Color.White.copy(alpha = 0.08f),
+                    0.75f to Color.White.copy(alpha = 0.04f),
+                    1.0f to Color.White.copy(alpha = 0.10f)
                 )
-            )
-        } else {
-            Brush.verticalGradient(
+            } else {
+                Brush.verticalGradient(
+                    0.0f to Color.White.copy(alpha = 0.86f),
+                    0.50f to Color(0xFFFAF4F6).copy(alpha = 0.74f),
+                    1.0f to Color(0xFFF3E9ED).copy(alpha = 0.80f)
+                )
+            }
+        }
+        val liquidDepthVeil = if (tokens.isDark) Color(0xFF0A070C).copy(alpha = 0.36f) else Color.White.copy(alpha = 0.14f)
+        val panelBorder = remember(tokens.isDark) {
+            Brush.linearGradient(
                 listOf(
-                    Color.White.copy(alpha = 0.95f),
-                    Color(0xFFF6F1F3).copy(alpha = 0.92f)
+                    if (tokens.isDark) Color.White.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.90f),
+                    tokens.accentRose.copy(alpha = if (tokens.isDark) 0.32f else 0.20f),
+                    if (tokens.isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.08f)
                 )
             )
         }
-        val panelBorder = Brush.linearGradient(
-            listOf(
-                if (tokens.isDark) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.14f),
-                tokens.accentRose.copy(alpha = if (tokens.isDark) 0.34f else 0.22f),
-                tokens.borderSubtle
-            )
-        )
 
         Column(
             modifier = Modifier
-                .widthIn(min = 212.dp, max = 248.dp)
+                .widthIn(min = 212.dp, max = 252.dp)
                 .shadow(
-                    elevation = 20.dp,
+                    elevation = if (tokens.isDark) 18.dp else 10.dp,
                     shape = panelShape,
-                    ambientColor = Color.Black.copy(alpha = 0.50f),
-                    spotColor = Color.Black.copy(alpha = 0.50f)
+                    ambientColor = Color.Black.copy(alpha = 0.40f),
+                    spotColor = Color.Black.copy(alpha = 0.40f)
                 )
                 .clip(panelShape)
-                .background(panelBg)
-                .border(0.9.dp, panelBorder, panelShape)
+                .background(liquidDepthVeil)
+                .background(liquidGlassFill)
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = if (tokens.isDark) 0.16f else 0.50f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.80f, 0f),
+                            radius = size.width * 0.75f
+                        ),
+                        center = Offset(size.width * 0.80f, 0f),
+                        radius = size.width * 0.75f
+                    )
+                }
+                .border(1.dp, panelBorder, panelShape)
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {

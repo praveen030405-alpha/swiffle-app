@@ -32,7 +32,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.geometry.Offset
@@ -55,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -79,10 +86,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import java.util.concurrent.Executors
 import com.swiffle.app.conversion.ImageToPdfConverter
 import com.swiffle.app.theme.*
+import com.swiffle.app.ui.components.DarkVoidAmbientLightPulse
 import com.swiffle.app.ui.components.StockMaterialLogoShimmer
 import com.swiffle.app.ui.components.SwiffleAnim
 import com.swiffle.app.ui.components.SwiffleLottieOneShot
 import com.swiffle.app.ui.components.WinUiToggleSwitch
+import com.swiffle.app.ui.home.HomeThemeTokens
+import com.swiffle.app.ui.home.rememberHomeTokens
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.roundToInt
@@ -110,7 +120,8 @@ private enum class HubScreen {
     REVIEW_CONVERT,
     SMART_SCAN_DOCS,
     SMART_SCAN_ID_CARD,
-    EXCEL_STUDIO
+    EXCEL_STUDIO,
+    PDF_TO_MARKDOWN
 }
 
 data class ToolItem(
@@ -140,19 +151,20 @@ fun ImageToPdfScreen(
     val haptic  = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val isDark  = com.swiffle.app.theme.ThemeManager.isDarkThemeActive()
+    val tokens  = rememberHomeTokens(isDark = isDark)
     val supportsBlur = remember { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
 
     // Screen navigation state
     var currentScreen by remember { mutableStateOf(HubScreen.TOOLS_HUB) }
 
-    // ── Fluent Material Tokens (Deep Dark Void Black for Dark Theme) ────────────────
-    val micaBackdrop   = if (isDark) Color(0xFF000000) else Color(0xFFF3F3F3)
-    val cardLayerFill  = if (isDark) Color(0xFF0C0C0C) else Color(0xFFFFFFFF)
-    val cardNestedFill = if (isDark) Color(0xFF161616) else Color(0xFFF8F9FA)
-    val specularStroke = if (isDark) Color(0x2EFFFFFF) else Color(0x14000000)
-    val textPrimary    = if (isDark) Color(0xFFFFFFFF) else Color(0xFF1E1E1E)
-    val textSecondary  = if (isDark) Color(0xFFB5B5B5) else Color(0xFF5D5D5D)
-    val textTertiary   = if (isDark) Color(0xFF7A7A7A) else Color(0xFF8A8A8A)
+    // ── Unified Swiffle Obsidian / Light Ivory Surface Tokens ────────────────
+    val micaBackdrop   = if (isDark) Color(0xFF000000) else tokens.bgVoid
+    val cardLayerFill  = tokens.cardTop
+    val cardNestedFill = tokens.cardBottom
+    val specularStroke = tokens.borderSubtle
+    val textPrimary    = tokens.textPrimary
+    val textSecondary  = tokens.textSecondary
+    val textTertiary   = tokens.textMuted
 
     // Sub-tool dialog states
     var compressTargetUri by remember { mutableStateOf<Uri?>(null) }
@@ -262,7 +274,7 @@ fun ImageToPdfScreen(
     BackHandler(enabled = true) {
         when (currentScreen) {
             HubScreen.REVIEW_CONVERT -> currentScreen = HubScreen.IMAGE_TO_PDF
-            HubScreen.IMAGE_TO_PDF, HubScreen.EXCEL_STUDIO -> currentScreen = HubScreen.TOOLS_HUB
+            HubScreen.IMAGE_TO_PDF, HubScreen.EXCEL_STUDIO, HubScreen.PDF_TO_MARKDOWN -> currentScreen = HubScreen.TOOLS_HUB
             HubScreen.SMART_SCAN_DOCS, HubScreen.SMART_SCAN_ID_CARD -> {
                 currentScreen = if (vm.images.value.isNotEmpty()) {
                     HubScreen.REVIEW_CONVERT
@@ -272,7 +284,7 @@ fun ImageToPdfScreen(
         }
     }
 
-    // ── Windows 11 Fluent Animated Screen Router (Fade & Horizontal Slide In / Out) ──
+    // ── Animated Screen Router (Fade & Horizontal Slide In / Out) ──
     AnimatedContent(
         targetState = currentScreen,
         transitionSpec = {
@@ -296,7 +308,7 @@ fun ImageToPdfScreen(
                 )
             } else if (
                 (initialState == HubScreen.REVIEW_CONVERT && (targetState == HubScreen.IMAGE_TO_PDF || targetState == HubScreen.TOOLS_HUB)) ||
-                ((initialState == HubScreen.IMAGE_TO_PDF || initialState == HubScreen.EXCEL_STUDIO) && targetState == HubScreen.TOOLS_HUB)
+                ((initialState == HubScreen.IMAGE_TO_PDF || initialState == HubScreen.EXCEL_STUDIO || initialState == HubScreen.PDF_TO_MARKDOWN) && targetState == HubScreen.TOOLS_HUB)
             ) {
                 // Horizontal Pop (Backward Return)
                 com.swiffle.app.theme.SwiffleMotion.horizontalBackward()
@@ -314,6 +326,7 @@ fun ImageToPdfScreen(
                     onBack = onBack,
                     onNavigateToImageToPdf = { currentScreen = HubScreen.IMAGE_TO_PDF },
                     onNavigateToExcel = { currentScreen = HubScreen.EXCEL_STUDIO },
+                    onNavigateToPdfToMarkdown = { currentScreen = HubScreen.PDF_TO_MARKDOWN },
                     onStartSmartScan = {
                         scannerSourceScreen = HubScreen.TOOLS_HUB
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -336,12 +349,7 @@ fun ImageToPdfScreen(
                     onPickPdfToImport = { importPdfPicker.launch("application/pdf") },
                     onPickPdfToPrint = { printPdfPicker.launch("application/pdf") },
                     onPickOfficeFile = { officeFilePicker.launch("*/*") },
-                    micaBackdrop = micaBackdrop,
-                    cardLayerFill = cardLayerFill,
-                    specularStroke = specularStroke,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary,
-                    textTertiary = textTertiary,
+                    tokens = tokens,
                     haptic = haptic,
                     context = context
                 )
@@ -435,10 +443,16 @@ fun ImageToPdfScreen(
                     onBack = { currentScreen = HubScreen.TOOLS_HUB }
                 )
             }
+
+            HubScreen.PDF_TO_MARKDOWN -> {
+                PdfToMarkdownScreen(
+                    onBack = { currentScreen = HubScreen.TOOLS_HUB }
+                )
+            }
         }
     }
 
-    // ── Animated Dialog: Compress PDF Modal Sheet ─────────────────────────────
+    // ── Animated Dialog: Compress PDF Modal Sheet (Obsidian Glass) ────────────
     if (showCompressModal && compressTargetUri != null) {
         Dialog(
             onDismissRequest = { if (!isCompressing) showCompressModal = false },
@@ -447,115 +461,117 @@ fun ImageToPdfScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.50f)),
+                    .background(Color.Black.copy(alpha = 0.62f)),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                Surface(
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                    color = cardLayerFill,
-                    border = BorderStroke(1.dp, specularStroke),
-                    modifier = Modifier.fillMaxWidth()
+                val sheetShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 600.dp)
+                        .clip(sheetShape)
+                        .background(Brush.verticalGradient(listOf(tokens.surfaceElevatedTop, tokens.surfaceElevatedBottom)))
+                        .border(0.9.dp, tokens.borderStrong, sheetShape)
+                        .navigationBarsPadding()
+                        .padding(22.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(20.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
+                        Text(
+                            "Compress PDF",
+                            color = tokens.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp,
+                            fontFamily = ClaudeSerif
+                        )
+                        IconButton(
+                            onClick = { showCompressModal = false },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Filled.Close, "Close", tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    CompressionLevel.values().forEach { level ->
+                        val isSelected = level == selectedCompressLevel
+                        val itemShape = RoundedCornerShape(16.dp)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                "Compress PDF",
-                                color = textPrimary,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 18.sp,
-                                fontFamily = GoogleSans
-                            )
-                            IconButton(
-                                onClick = { showCompressModal = false },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(Icons.Filled.Close, "Close", tint = textSecondary, modifier = Modifier.size(18.dp))
-                            }
-                        }
-
-                        Spacer(Modifier.height(14.dp))
-
-                        CompressionLevel.values().forEach { level ->
-                            val isSelected = level == selectedCompressLevel
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) FluentCobaltBlue.copy(alpha = 0.08f) else cardNestedFill,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSelected) FluentCobaltBlue else specularStroke
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable { selectedCompressLevel = level }
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            level.title,
-                                            color = textPrimary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 13.5.sp
-                                        )
-                                        Text(
-                                            level.subtitle,
-                                            color = textSecondary,
-                                            fontSize = 11.5.sp
-                                        )
-                                    }
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = { selectedCompressLevel = level },
-                                        colors = RadioButtonDefaults.colors(selectedColor = FluentCobaltBlue)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(18.dp))
-
-                        Button(
-                            onClick = {
-                                isCompressing = true
-                                compressProgress = 0
-                                coroutineScope.launch {
-                                    val res = PdfToolsEngine.compressPdf(
-                                        context = context,
-                                        pdfUri = compressTargetUri!!,
-                                        level = selectedCompressLevel
-                                    ) { prog -> compressProgress = prog }
-                                    isCompressing = false
-                                    showCompressModal = false
-                                    res.fold(
-                                        onSuccess = { compressionResult = it },
-                                        onFailure = { Toast.makeText(context, it.message ?: "Compression failed", Toast.LENGTH_SHORT).show() }
-                                    )
-                                }
-                            },
-                            enabled = !isCompressing,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp),
-                            shape = RoundedCornerShape(4.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FluentCobaltBlue)
+                                .padding(vertical = 4.dp)
+                                .clip(itemShape)
+                                .background(
+                                    if (isSelected) tokens.accentRose.copy(alpha = if (isDark) 0.16f else 0.09f)
+                                    else tokens.cardBottom
+                                )
+                                .border(
+                                    width = if (isSelected) 1.1.dp else 0.8.dp,
+                                    color = if (isSelected) tokens.accentRose else tokens.borderSubtle,
+                                    shape = itemShape
+                                )
+                                .clickable { selectedCompressLevel = level }
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            if (isCompressing) {
-                                Text("Compressing $compressProgress%…", color = Color.White, fontWeight = FontWeight.SemiBold)
-                            } else {
-                                Text("COMPRESS", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    level.title,
+                                    color = tokens.textPrimary,
+                                    fontFamily = ClaudeSerif,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.5.sp
+                                )
+                                Text(
+                                    level.subtitle,
+                                    color = tokens.textSecondary,
+                                    fontFamily = ClaudeSans,
+                                    fontSize = 12.sp
+                                )
                             }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { selectedCompressLevel = level },
+                                colors = RadioButtonDefaults.colors(selectedColor = tokens.accentRose)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Button(
+                        onClick = {
+                            isCompressing = true
+                            compressProgress = 0
+                            coroutineScope.launch {
+                                val res = PdfToolsEngine.compressPdf(
+                                    context = context,
+                                    pdfUri = compressTargetUri!!,
+                                    level = selectedCompressLevel
+                                ) { prog -> compressProgress = prog }
+                                isCompressing = false
+                                showCompressModal = false
+                                res.fold(
+                                    onSuccess = { compressionResult = it },
+                                    onFailure = { Toast.makeText(context, it.message ?: "Compression failed", Toast.LENGTH_SHORT).show() }
+                                )
+                            }
+                        },
+                        enabled = !isCompressing,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1420))
+                    ) {
+                        if (isCompressing) {
+                            Text("Compressing $compressProgress%…", color = Color.White, fontFamily = ClaudeSans, fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Text("Compress PDF", color = Color.White, fontFamily = ClaudeSans, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp)
                         }
                     }
                 }
@@ -563,162 +579,162 @@ fun ImageToPdfScreen(
         }
     }
 
-    // ── Animated Dialog: Compression Success Modal ────────────────────────────
+    // ── Animated Dialog: Compression Success Modal (Obsidian Glass) ───────────
     if (compressionResult != null) {
         val r = compressionResult!!
         Dialog(
             onDismissRequest = { compressionResult = null },
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
         ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = cardLayerFill,
-                shadowElevation = 24.dp,
-                border = BorderStroke(1.dp, specularStroke),
+            val dialogShape = RoundedCornerShape(24.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 12.dp)
+                    .clip(dialogShape)
+                    .background(Brush.verticalGradient(listOf(tokens.surfaceElevatedTop, tokens.surfaceElevatedBottom)))
+                    .border(0.9.dp, tokens.borderStrong, dialogShape)
+                    .padding(24.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp)
+                SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Compressed successfully!",
+                    color = tokens.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 19.sp,
+                    fontFamily = ClaudeSerif
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${PdfToolsEngine.formatBytes(r.originalSizeBytes)} → ${PdfToolsEngine.formatBytes(r.compressedSizeBytes)} (${r.reductionPercent}% reduced)",
+                    color = tokens.accentRose,
+                    fontFamily = ClaudeSans,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(tokens.cardBottom)
+                        .border(0.8.dp, tokens.borderSubtle, RoundedCornerShape(14.dp))
+                        .padding(12.dp)
                 ) {
-                    SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Compressed successfully!",
-                        color = textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                        fontFamily = GoogleSans
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${PdfToolsEngine.formatBytes(r.originalSizeBytes)} → ${PdfToolsEngine.formatBytes(r.compressedSizeBytes)} (${r.reductionPercent}% reduced)",
-                        color = FluentCobaltBlue,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = cardNestedFill,
-                        border = BorderStroke(1.dp, specularStroke),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Icon(FluentIcons.Compress, null, tint = FluentCobaltBlue, modifier = Modifier.size(22.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(r.outputFile.name, color = textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Saved in Documents/Swiffle", color = textTertiary, fontSize = 11.sp)
-                            }
-                        }
+                    Icon(FluentIcons.Compress, null, tint = tokens.accentRose, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(r.outputFile.name, color = tokens.textPrimary, fontFamily = ClaudeSans, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Saved in Documents/Swiffle", color = tokens.textMuted, fontFamily = ClaudeSans, fontSize = 11.sp)
                     }
+                }
 
-                    Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(18.dp))
 
-                    Button(
-                        onClick = {
-                            val target = r.contentUri
-                            val name = r.outputFile.name
-                            compressionResult = null
-                            onOpenPdf(target, name)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FluentCobaltBlue)
-                    ) {
-                        Text("OPEN", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    }
+                Button(
+                    onClick = {
+                        val target = r.contentUri
+                        val name = r.outputFile.name
+                        compressionResult = null
+                        onOpenPdf(target, name)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1420))
+                ) {
+                    Text("Open PDF", color = Color.White, fontFamily = ClaudeSans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }
     }
 
-    // ── Animated Dialog: Merge Success Modal ──────────────────────────────────
+    // ── Animated Dialog: Merge Success Modal (Obsidian Glass) ─────────────────
     if (mergeResult != null) {
         val r = mergeResult!!
         Dialog(onDismissRequest = { mergeResult = null }) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = cardLayerFill,
-                shadowElevation = 24.dp,
-                border = BorderStroke(1.dp, specularStroke),
+            val dialogShape = RoundedCornerShape(24.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 12.dp)
+                    .clip(dialogShape)
+                    .background(Brush.verticalGradient(listOf(tokens.surfaceElevatedTop, tokens.surfaceElevatedBottom)))
+                    .border(0.9.dp, tokens.borderStrong, dialogShape)
+                    .padding(24.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                    SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("PDFs Merged Successfully!", color = textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, fontFamily = GoogleSans)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Combined into ${r.totalPages} pages (${PdfToolsEngine.formatBytes(r.fileSizeBytes)})", color = textSecondary, fontSize = 13.sp)
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = {
-                            val uri = r.contentUri
-                            val name = r.outputFile.name
-                            mergeResult = null
-                            onOpenPdf(uri, name)
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FluentCobaltBlue)
-                    ) {
-                        Text("OPEN", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
+                SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
+                Spacer(Modifier.height(8.dp))
+                Text("PDFs Merged Successfully!", color = tokens.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, fontFamily = ClaudeSerif)
+                Spacer(Modifier.height(4.dp))
+                Text("Combined into ${r.totalPages} pages (${PdfToolsEngine.formatBytes(r.fileSizeBytes)})", color = tokens.textSecondary, fontFamily = ClaudeSans, fontSize = 13.sp)
+                Spacer(Modifier.height(18.dp))
+                Button(
+                    onClick = {
+                        val uri = r.contentUri
+                        val name = r.outputFile.name
+                        mergeResult = null
+                        onOpenPdf(uri, name)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1420))
+                ) {
+                    Text("Open PDF", color = Color.White, fontFamily = ClaudeSans, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
 
-    // ── Animated Dialog: PDF to JPG Success Modal ─────────────────────────────
+    // ── Animated Dialog: PDF to JPG Success Modal (Obsidian Glass) ────────────
     if (pdfToJpgResult != null) {
         val r = pdfToJpgResult!!
         Dialog(onDismissRequest = { pdfToJpgResult = null }) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = cardLayerFill,
-                border = BorderStroke(1.dp, specularStroke),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            val dialogShape = RoundedCornerShape(24.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .clip(dialogShape)
+                    .background(Brush.verticalGradient(listOf(tokens.surfaceElevatedTop, tokens.surfaceElevatedBottom)))
+                    .border(0.9.dp, tokens.borderStrong, dialogShape)
+                    .padding(24.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                    SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Images Extracted!", color = textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, fontFamily = GoogleSans)
-                    Spacer(Modifier.height(4.dp))
-                    Text("${r.pageCount} pages saved as high-res JPG in Gallery", color = textSecondary, fontSize = 13.sp)
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = { pdfToJpgResult = null },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FluentCobaltBlue)
-                    ) {
-                        Text("DONE", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
+                SwiffleLottieOneShot(SwiffleAnim.SUCCESS_CHECK, size = 80.dp)
+                Spacer(Modifier.height(8.dp))
+                Text("Images Extracted!", color = tokens.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 19.sp, fontFamily = ClaudeSerif)
+                Spacer(Modifier.height(4.dp))
+                Text("${r.pageCount} pages saved as high-res JPG in Gallery", color = tokens.textSecondary, fontFamily = ClaudeSans, fontSize = 13.sp)
+                Spacer(Modifier.height(18.dp))
+                Button(
+                    onClick = { pdfToJpgResult = null },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1420))
+                ) {
+                    Text("Done", color = Color.White, fontFamily = ClaudeSans, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
 }
 
-// ── Windows 11 Fluent Tools Hub Content ───────────────────────────────────────
+// ── Swiffle Obsidian Dark Void & Liquid Glass Tools Hub ───────────────────────
 
 @Composable
 private fun FluentToolsHubContent(
     onBack: () -> Unit,
     onNavigateToImageToPdf: () -> Unit,
     onNavigateToExcel: () -> Unit = {},
+    onNavigateToPdfToMarkdown: () -> Unit = {},
     onStartSmartScan: () -> Unit,
     onStartIdCardScan: () -> Unit,
     onPickSinglePdf: () -> Unit,
@@ -727,168 +743,506 @@ private fun FluentToolsHubContent(
     onPickPdfToImport: () -> Unit,
     onPickPdfToPrint: () -> Unit,
     onPickOfficeFile: () -> Unit,
-    micaBackdrop: Color,
-    cardLayerFill: Color,
-    specularStroke: Color,
-    textPrimary: Color,
-    textSecondary: Color,
-    textTertiary: Color,
+    tokens: HomeThemeTokens,
     haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
     context: Context
 ) {
-    Scaffold(
-        containerColor = micaBackdrop,
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(micaBackdrop)
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                ) {
-                    FluentSubtleButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        onClick = onBack,
-                        tint = textPrimary,
-                        surface = cardLayerFill,
-                        stroke = specularStroke
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Text(
-                        "Tools",
-                        color = textPrimary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = GoogleSans
-                    )
-                }
-            }
+    // Harmonized Obsidian / Light Ivory Accent Palette matching Homepage ObsidianToolsCarouselSection
+    val pdfRoseTint   = if (tokens.isDark) Color(0xFFF07178) else Color(0xFFD13438)
+    val excelMintTint = if (tokens.isDark) Color(0xFF56C288) else Color(0xFF107C41)
+    val wordBlueTint  = if (tokens.isDark) Color(0xFF6B9EFF) else Color(0xFF185ABD)
+    val pptCoralTint  = if (tokens.isDark) Color(0xFFF28B66) else Color(0xFFD83B01)
+    val lockCyanTint  = if (tokens.isDark) Color(0xFF67B7DC) else Color(0xFF0078D4)
+    val ocrVioletTint = if (tokens.isDark) Color(0xFFB89BFF) else Color(0xFF6B46C1)
+
+    val backPillFill = remember(tokens.isDark) {
+        if (tokens.isDark) {
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.05f)))
+        } else {
+            Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F1F1)))
         }
-    ) { innerPadding ->
+    }
+    val backPillBorder = remember(tokens.isDark) {
+        Brush.linearGradient(
+            listOf(
+                if (tokens.isDark) Color.White.copy(alpha = 0.28f) else tokens.borderStrong,
+                tokens.accentRose.copy(alpha = 0.28f),
+                tokens.borderSubtle
+            )
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (tokens.isDark) Color(0xFF000000) else tokens.bgVoid)
+    ) {
+        if (tokens.isDark) {
+            DarkVoidAmbientLightPulse(
+                activeStageIndex = 0,
+                activeSubStepIndex = 0,
+                transitionDepthProgress = 0.25f,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 6.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
-            // Feature Request Banner
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = cardLayerFill,
-                border = BorderStroke(1.dp, specularStroke),
+            // ── Floating Glass Top Bar (Unified with Home & Chat) ─────────────
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        Toast.makeText(context, "Thank you! Feature suggestions are logged.", Toast.LENGTH_SHORT).show()
-                    }
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(backPillFill)
+                        .border(0.9.dp, backPillBorder, CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true, color = tokens.textPrimary.copy(alpha = 0.16f)),
+                            onClick = onBack
+                        )
+                        .testTag("tools_back_button"),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(FluentCobaltBlue.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Lightbulb, null, tint = FluentCobaltBlue, modifier = Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Request a new feature",
-                            color = textPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            fontFamily = GoogleSans
-                        )
-                        Text(
-                            "What other features do you want?",
-                            color = textSecondary,
-                            fontSize = 11.5.sp
-                        )
-                    }
-                    Icon(Icons.Filled.ChevronRight, null, tint = textTertiary, modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        tint = tokens.textPrimary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Swiffle Tools",
+                        color = tokens.textPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = ClaudeSerif,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Document conversion, layout & capture studio",
+                        color = tokens.textMuted,
+                        fontSize = 12.sp,
+                        fontFamily = ClaudeSans,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            // ── Section: Convert & PDF Tools ─────────────────────────────────
-            Text(
-                "Convert",
-                color = textPrimary,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                fontFamily = GoogleSans,
-                modifier = Modifier.padding(start = 2.dp)
-            )
+            // ── Scrollable Centered Adaptive Tools Workspace ──────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 680.dp)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .padding(bottom = 36.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    // ── Featured Hero Spotlight: Unlimited-Page PDF to Markdown ─
+                    ObsidianFeaturedMarkdownCard(
+                        tokens = tokens,
+                        accentTint = ocrVioletTint,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onNavigateToPdfToMarkdown()
+                        }
+                    )
 
-            val convertTools = listOf(
-                ToolItem("img_pdf", "Image to PDF", FluentIcons.DocumentPdf, FluentPdfRed, "PDF"),
-                ToolItem("docs_pdf", "Docs to PDF", FluentIcons.DocumentWord, FluentWordBlue, "Word"),
-                ToolItem("pdf_docx", "PDF to Docx", FluentIcons.DocumentWord, FluentWordBlue, "Word"),
-                ToolItem("pdf_ppt", "PDF to PPT", FluentIcons.DocumentPpt, FluentPptOrange, "PPT"),
-                ToolItem("ppt_pdf", "PPT to PDF", FluentIcons.DocumentPpt, FluentPptOrange, "PPT"),
-                ToolItem("pdf_jpg", "PDF to JPG", FluentIcons.DocumentJpg, FluentPdfRed, "JPG"),
-                ToolItem("pdf_excel", "PDF to Excel", FluentIcons.DocumentExcel, FluentExcelGreen, "Excel"),
-                ToolItem("excel_pdf", "Excel to PDF", FluentIcons.DocumentExcel, FluentExcelGreen, "Excel"),
-                ToolItem("merge_pdf", "Merge PDF", FluentIcons.MergePdf, FluentPptOrange, "Merge"),
-                ToolItem("lock_pdf", "Lock PDF", FluentIcons.Lock, FluentCobaltBlue, "Protect"),
-                ToolItem("unlock_pdf", "Unlock PDF", FluentIcons.Unlock, FluentCobaltBlue, "Security"),
-                ToolItem("smart_ocr", "Smart OCR", FluentIcons.Sparkle, Color(0xFF6B46C1), "AI")
-            )
+                    // ── Section: Convert & Transform ──────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Convert & Transform",
+                            color = tokens.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 17.sp,
+                            fontFamily = ClaudeSerif,
+                            modifier = Modifier.padding(start = 2.dp)
+                        )
+                        Text(
+                            text = "14 tools",
+                            color = tokens.textMuted,
+                            fontSize = 12.sp,
+                            fontFamily = ClaudeSans
+                        )
+                    }
 
-            FluentToolsGrid(
-                tools = convertTools,
-                cardFill = cardLayerFill,
-                stroke = specularStroke,
-                textPrimary = textPrimary,
-                onToolClick = { item ->
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    when (item.id) {
-                        "img_pdf" -> onNavigateToImageToPdf()
-                        "pdf_excel" -> onNavigateToExcel()
-                        "docs_pdf", "ppt_pdf", "excel_pdf" -> onPickOfficeFile()
-                        "pdf_docx", "pdf_ppt", "pdf_jpg", "lock_pdf", "unlock_pdf" -> onPickSinglePdf()
-                        "merge_pdf" -> onPickMultiPdf()
-                        "smart_ocr" -> Toast.makeText(context, "Smart OCR Engine ready for configuration", Toast.LENGTH_SHORT).show()
+                    val convertTools = remember(tokens.isDark) {
+                        listOf(
+                            ToolItem("pdf_md", "PDF to MD", Icons.Rounded.Code, ocrVioletTint, "∞ Pages"),
+                            ToolItem("img_pdf", "Image to PDF", FluentIcons.DocumentPdf, pdfRoseTint, "PDF"),
+                            ToolItem("pdf_excel", "PDF to Excel", FluentIcons.DocumentExcel, excelMintTint, "Excel"),
+                            ToolItem("pdf_jpg", "PDF to JPG", FluentIcons.DocumentJpg, pdfRoseTint, "JPG"),
+                            ToolItem("merge_pdf", "Merge PDF", FluentIcons.MergePdf, pptCoralTint, "Merge"),
+                            ToolItem("compress_pdf", "Compress PDF", FluentIcons.Compress, pptCoralTint, "Shrink"),
+                            ToolItem("docs_pdf", "Docs to PDF", FluentIcons.DocumentWord, wordBlueTint, "Word"),
+                            ToolItem("pdf_docx", "PDF to Docx", FluentIcons.DocumentWord, wordBlueTint, "Word"),
+                            ToolItem("pdf_ppt", "PDF to PPT", FluentIcons.DocumentPpt, pptCoralTint, "PPT"),
+                            ToolItem("ppt_pdf", "PPT to PDF", FluentIcons.DocumentPpt, pptCoralTint, "PPT"),
+                            ToolItem("excel_pdf", "Excel to PDF", FluentIcons.DocumentExcel, excelMintTint, "Excel"),
+                            ToolItem("lock_pdf", "Lock PDF", FluentIcons.Lock, lockCyanTint, "Protect"),
+                            ToolItem("unlock_pdf", "Unlock PDF", FluentIcons.Unlock, lockCyanTint, "Security"),
+                            ToolItem("smart_ocr", "Smart OCR", FluentIcons.Sparkle, ocrVioletTint, "OCR")
+                        )
+                    }
+
+                    FluentToolsGrid(
+                        tools = convertTools,
+                        tokens = tokens,
+                        onToolClick = { item ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            when (item.id) {
+                                "pdf_md" -> onNavigateToPdfToMarkdown()
+                                "img_pdf" -> onNavigateToImageToPdf()
+                                "pdf_excel" -> onNavigateToExcel()
+                                "pdf_jpg" -> onPickPdfForJpg()
+                                "compress_pdf" -> onPickSinglePdf()
+                                "docs_pdf", "ppt_pdf", "excel_pdf" -> onPickOfficeFile()
+                                "pdf_docx", "pdf_ppt", "lock_pdf", "unlock_pdf" -> onPickSinglePdf()
+                                "merge_pdf" -> onPickMultiPdf()
+                                "smart_ocr" -> onNavigateToPdfToMarkdown()
+                            }
+                        }
+                    )
+
+                    // ── Section: Capture & Scan ───────────────────────────────
+                    Text(
+                        text = "Scan & Capture",
+                        color = tokens.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 17.sp,
+                        fontFamily = ClaudeSerif,
+                        modifier = Modifier.padding(start = 2.dp, top = 2.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ObsidianWideToolCard(
+                            title = "Smart Scan",
+                            subtitle = "Multi-page camera capture",
+                            icon = Icons.Rounded.DocumentScanner,
+                            accentTint = pdfRoseTint,
+                            tokens = tokens,
+                            testTag = "tool_card_smart_scan",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onStartSmartScan()
+                            }
+                        )
+                        ObsidianWideToolCard(
+                            title = "ID Card Scan",
+                            subtitle = "Front & back to single PDF",
+                            icon = Icons.Rounded.CreditCard,
+                            accentTint = excelMintTint,
+                            tokens = tokens,
+                            testTag = "tool_card_id_scan",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onStartIdCardScan()
+                            }
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ObsidianFeaturedMarkdownCard(
+    tokens: HomeThemeTokens,
+    accentTint: Color,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 500f),
+        label = "featured_md_scale"
+    )
+    val shape = RoundedCornerShape(22.dp)
+    val fillBrush = remember(tokens.isDark) {
+        Brush.verticalGradient(listOf(tokens.cardTop, tokens.cardBottom))
+    }
+    val borderBrush = remember(tokens.isDark, accentTint) {
+        Brush.linearGradient(
+            listOf(
+                if (tokens.isDark) Color.White.copy(alpha = 0.28f) else tokens.borderStrong,
+                accentTint.copy(alpha = if (tokens.isDark) 0.42f else 0.28f),
+                tokens.accentRose.copy(alpha = if (tokens.isDark) 0.30f else 0.16f)
+            )
+        )
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(fillBrush)
+            .drawBehind {
+                if (tokens.isDark) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(accentTint.copy(alpha = 0.20f), Color.Transparent),
+                            center = Offset(size.width * 0.12f, size.height * 0.22f),
+                            radius = size.width * 0.58f
+                        ),
+                        center = Offset(size.width * 0.12f, size.height * 0.22f),
+                        radius = size.width * 0.58f
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(tokens.accentRose.copy(alpha = 0.14f), Color.Transparent),
+                            center = Offset(size.width * 0.92f, size.height * 0.86f),
+                            radius = size.width * 0.48f
+                        ),
+                        center = Offset(size.width * 0.92f, size.height * 0.86f),
+                        radius = size.width * 0.48f
+                    )
+                }
+            }
+            .border(1.dp, borderBrush, shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = accentTint.copy(alpha = 0.18f)),
+                onClick = onClick
+            )
+            .padding(horizontal = 18.dp, vertical = 18.dp)
+            .testTag("tools_featured_pdf_to_md")
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(accentTint.copy(alpha = if (tokens.isDark) 0.18f else 0.11f))
+                .border(0.9.dp, accentTint.copy(alpha = 0.40f), RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Code,
+                contentDescription = "PDF to Markdown",
+                tint = accentTint,
+                modifier = Modifier.size(25.dp)
+            )
+        }
+
+        Spacer(Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "PDF to Markdown",
+                    color = tokens.textPrimary,
+                    fontFamily = ClaudeSerif,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accentTint.copy(alpha = if (tokens.isDark) 0.20f else 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "∞ PAGES",
+                        color = accentTint,
+                        fontFamily = ClaudeSans,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.4.sp
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Stream 500+ page PDFs into clean .md with tables, TOC, code blocks & OCR fallback.",
+                color = tokens.textSecondary,
+                fontFamily = ClaudeSans,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    if (tokens.isDark) Color.White.copy(alpha = 0.08f)
+                    else Color.Black.copy(alpha = 0.05f)
+                )
+                .border(0.8.dp, tokens.borderSubtle, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = "Open PDF to Markdown",
+                tint = tokens.textPrimary,
+                modifier = Modifier.size(17.dp)
             )
         }
     }
 }
 
-// ── Fluent 3-Column Bento Grid ────────────────────────────────────────────────
+@Composable
+private fun ObsidianWideToolCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accentTint: Color,
+    tokens: HomeThemeTokens,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 500f),
+        label = "wide_tool_scale"
+    )
+    val shape = RoundedCornerShape(20.dp)
+    val fillBrush = remember(tokens.isDark) {
+        Brush.verticalGradient(listOf(tokens.cardTop, tokens.cardBottom))
+    }
+    val borderBrush = remember(tokens.isDark, accentTint) {
+        Brush.linearGradient(
+            listOf(
+                if (tokens.isDark) Color.White.copy(alpha = 0.22f) else tokens.borderStrong,
+                accentTint.copy(alpha = if (tokens.isDark) 0.28f else 0.16f),
+                tokens.borderSubtle
+            )
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .heightIn(min = 104.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(fillBrush)
+            .drawBehind {
+                if (tokens.isDark) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(accentTint.copy(alpha = 0.14f), Color.Transparent),
+                            center = Offset(size.width * 0.20f, size.height * 0.20f),
+                            radius = size.width * 0.72f
+                        ),
+                        center = Offset(size.width * 0.20f, size.height * 0.20f),
+                        radius = size.width * 0.72f
+                    )
+                }
+            }
+            .border(0.9.dp, borderBrush, shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = accentTint.copy(alpha = 0.16f)),
+                onClick = onClick
+            )
+            .padding(14.dp)
+            .testTag(testTag),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(accentTint.copy(alpha = if (tokens.isDark) 0.16f else 0.10f))
+                .border(0.8.dp, accentTint.copy(alpha = 0.34f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = accentTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = title,
+            color = tokens.textPrimary,
+            fontFamily = ClaudeSerif,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = subtitle,
+            color = tokens.textMuted,
+            fontFamily = ClaudeSans,
+            fontSize = 11.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// ── Obsidian Glass 3-Column Bento Grid ────────────────────────────────────────
 
 @Composable
 private fun FluentToolsGrid(
     tools: List<ToolItem>,
-    cardFill: Color,
-    stroke: Color,
-    textPrimary: Color,
+    tokens: HomeThemeTokens,
     onToolClick: (ToolItem) -> Unit
 ) {
     val cols = 3
     val rows = (tools.size + cols - 1) / cols
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         for (r in 0 until rows) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 for (c in 0 until cols) {
                     val idx = r * cols + c
@@ -896,9 +1250,7 @@ private fun FluentToolsGrid(
                         val item = tools[idx]
                         FluentToolBentoCard(
                             item = item,
-                            cardFill = cardFill,
-                            stroke = stroke,
-                            textPrimary = textPrimary,
+                            tokens = tokens,
                             modifier = Modifier.weight(1f),
                             onClick = { onToolClick(item) }
                         )
@@ -914,9 +1266,7 @@ private fun FluentToolsGrid(
 @Composable
 private fun FluentToolBentoCard(
     item: ToolItem,
-    cardFill: Color,
-    stroke: Color,
-    textPrimary: Color,
+    tokens: HomeThemeTokens,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -924,56 +1274,85 @@ private fun FluentToolBentoCard(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.94f else 1f,
-        animationSpec = tween(FluentFasterDuration, easing = FluentDecelerate),
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 500f),
         label = "bentoPress"
     )
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = cardFill,
-        border = BorderStroke(1.dp, stroke),
-        shadowElevation = 1.5.dp,
+    val cardShape = RoundedCornerShape(20.dp)
+    val fillBrush = remember(tokens.isDark) {
+        Brush.verticalGradient(listOf(tokens.cardTop, tokens.cardBottom))
+    }
+    val borderBrush = remember(tokens.isDark, item.badgeColor) {
+        Brush.linearGradient(
+            listOf(
+                if (tokens.isDark) Color.White.copy(alpha = 0.20f) else tokens.borderStrong,
+                item.badgeColor.copy(alpha = if (tokens.isDark) 0.28f else 0.16f),
+                tokens.borderSubtle
+            )
+        )
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .aspectRatio(1.05f)
+            .aspectRatio(1.02f)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(item.badgeColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.title,
-                    tint = item.badgeColor,
-                    modifier = Modifier.size(20.dp)
-                )
+            .clip(cardShape)
+            .background(fillBrush)
+            .drawBehind {
+                if (tokens.isDark) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(item.badgeColor.copy(alpha = 0.15f), Color.Transparent),
+                            center = Offset(size.width * 0.5f, size.height * 0.32f),
+                            radius = size.width * 0.65f
+                        ),
+                        center = Offset(size.width * 0.5f, size.height * 0.32f),
+                        radius = size.width * 0.65f
+                    )
+                }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = item.title,
-                color = textPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                fontFamily = GoogleSans,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            .border(0.9.dp, borderBrush, cardShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = item.badgeColor.copy(alpha = 0.16f)),
+                onClick = onClick
+            )
+            .padding(horizontal = 8.dp, vertical = 10.dp)
+            .testTag("tool_card_${item.id}")
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(item.badgeColor.copy(alpha = if (tokens.isDark) 0.16f else 0.10f))
+                .border(0.8.dp, item.badgeColor.copy(alpha = 0.32f), RoundedCornerShape(13.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.title,
+                tint = item.badgeColor,
+                modifier = Modifier.size(21.dp)
             )
         }
+
+        Spacer(Modifier.height(9.dp))
+
+        Text(
+            text = item.title,
+            color = tokens.textPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            fontFamily = ClaudeSans,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

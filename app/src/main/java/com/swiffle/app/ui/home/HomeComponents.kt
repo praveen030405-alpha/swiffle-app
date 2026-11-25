@@ -71,6 +71,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
@@ -675,6 +676,13 @@ fun ObsidianToolsCarouselSection(
 
     val toolCards = remember(tokens.isDark) {
         listOf(
+            HomeToolCarouselItem(
+                id = "pdf_md",
+                title = "PDF to Markdown",
+                subtitle = "Unlimited pages → clean .md",
+                icon = Icons.Rounded.Code,
+                accentTint = ocrVioletTint
+            ),
             HomeToolCarouselItem(
                 id = "img_pdf",
                 title = "Convert Image to PDF",
