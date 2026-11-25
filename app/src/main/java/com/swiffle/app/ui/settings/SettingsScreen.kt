@@ -234,6 +234,7 @@ fun SettingsScreen(
                     onBack = { currentRoute = SettingsRoute.Main }
                 )
             }
+            SettingsRoute.Plugins -> com.swiffle.app.plugins.PluginSettings { currentRoute = SettingsRoute.Main }
             SettingsRoute.GoogleCloud -> {
                 GoogleCloudAndAiProvidersSubpage(
                     onBack = { currentRoute = SettingsRoute.Main }
@@ -463,6 +464,7 @@ private fun MainSettingsHub(
             SettingsSearchTarget("Dark Mode & Theme", "Pure pitch Void Black, OLED optimization", "SYSTEM & PREFERENCES", Icons.Outlined.Palette, SettingsRoute.Appearance),
             SettingsSearchTarget("Notifications", "Document processing alerts, conversion notifications", "SYSTEM & PREFERENCES", Icons.Outlined.Notifications, SettingsRoute.Notifications),
             SettingsSearchTarget("Swiffle Intelligence", "Local AI models, smart OCR, document summarization", "INTELLIGENCE & SERVICES", Icons.Outlined.AutoAwesome, SettingsRoute.Intelligence),
+            SettingsSearchTarget("Plugins", "ChatGPT connection and plugin access", "INTELLIGENCE & SERVICES", Icons.Outlined.Extension, SettingsRoute.Plugins),
             SettingsSearchTarget("Integrations & Cloud Services", "Google Cloud, Google Drive backup, connected storage", "INTELLIGENCE & SERVICES", Icons.Outlined.CloudQueue, SettingsRoute.GoogleCloud),
             SettingsSearchTarget("Manage Subscriptions", "Swiffle Plus, plan details, billing, upgrade", "INTELLIGENCE & SERVICES", Icons.Outlined.WorkspacePremium, SettingsRoute.Subscriptions),
             SettingsSearchTarget("Usage and limits", "Token balance, daily quota, usage breakdown", "INTELLIGENCE & SERVICES", Icons.Outlined.DataUsage, SettingsRoute.UsageLimits),
@@ -1042,6 +1044,13 @@ private fun MainSettingsHub(
                     iconPainter = androidx.compose.ui.res.painterResource(id = com.swiffle.app.R.drawable.ic_swiffle_logo_monochrome),
                     title = "Swiffle Intelligence",
                     onClick = { onNavigate(SettingsRoute.Intelligence) }
+                )
+                SettingsItemDivider()
+                SettingsItemRow(
+                    icon = Icons.Outlined.Extension,
+                    title = "Plugins",
+                    subtitle = "ChatGPT connection and plugin access",
+                    onClick = { onNavigate(SettingsRoute.Plugins) }
                 )
                 SettingsItemDivider()
                 SettingsItemRow(
@@ -4358,5 +4367,3 @@ private fun ProPricingTierCard(
         }
     }
 }
-
-

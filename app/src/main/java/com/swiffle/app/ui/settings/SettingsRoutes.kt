@@ -10,6 +10,7 @@ sealed interface SettingsRoute {
     data object Appearance : SettingsRoute
     data object Notifications : SettingsRoute
     data object Intelligence : SettingsRoute
+    data object Plugins : SettingsRoute
     data object GoogleCloud : SettingsRoute
     data object Subscriptions : SettingsRoute
     data object UsageLimits : SettingsRoute
