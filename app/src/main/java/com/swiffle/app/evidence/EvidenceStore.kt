@@ -92,6 +92,19 @@ internal class EvidenceStore private constructor(private val context: Context) {
         })
     }
 
+    suspend fun setReviewed(packId: String, itemId: String, reviewed: Boolean): Boolean {
+        var found = false
+        editPack(packId) { pack ->
+            pack.copy(items = pack.items.map { item ->
+                if (item.id == itemId) {
+                    found = true
+                    item.copy(reviewed = reviewed)
+                } else item
+            })
+        }
+        return found
+    }
+
     suspend fun move(packId: String, itemId: String, direction: Int) = editPack(packId) { pack ->
         pack.moveWithinGroup(itemId, direction)
     }
