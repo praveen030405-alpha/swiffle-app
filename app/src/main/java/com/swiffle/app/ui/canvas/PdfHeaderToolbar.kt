@@ -74,6 +74,8 @@ fun PdfHeaderToolbar(
     isSmartCropEnabled: Boolean = true,
     onToggleSmartCrop: () -> Unit = {},
     onOpenAskSwiffle: () -> Unit = {},
+    onClipPage: () -> Unit,
+    onOpenEvidencePacks: () -> Unit,
     isEditMode: Boolean = false,
     hasUnsavedEdits: Boolean = false,
     onToggleEditMode: () -> Unit = {},
@@ -88,8 +90,7 @@ fun PdfHeaderToolbar(
     val textPrimary = if (isDark) Color(0xFFF5F5F5) else Color(0xFF1A1A1A)
     val textMuted = if (isDark) Color(0xFF8A8A8A) else Color(0xFF6E6E6E)
     val borderSpecular = if (isDark) Color(0x22FFFFFF) else Color(0x0F000000)
-    val fluentCobalt = Color(0xFF0078D4)
-    val brandAccent = fluentCobalt
+    val brandAccent = com.swiffle.app.theme.SwiffleTheme.colors.primaryAccent
 
     AnimatedVisibility(
         visible = visible,
@@ -256,6 +257,16 @@ fun PdfHeaderToolbar(
                             border = BorderStroke(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x18000000)),
                             modifier = Modifier.widthIn(min = 220.dp, max = 280.dp)
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Clip page region") },
+                                onClick = { showOverflow = false; onClipPage() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Evidence packs") },
+                                onClick = { showOverflow = false; onOpenEvidencePacks() }
+                            )
+                            HorizontalDivider()
+
                             // Swiffle AI Assistant
                             DropdownMenuItem(
                                 text = {

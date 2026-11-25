@@ -1,5 +1,12 @@
 package com.swiffle.app.ui.canvas
 
+import com.swiffle.app.evidence.EvidenceBounds
+import com.swiffle.app.evidence.EvidenceCapture
+import com.swiffle.app.evidence.EvidencePacksActivity
+import com.swiffle.app.evidence.EvidenceRegionDialog
+import com.swiffle.app.evidence.EvidenceStore
+import com.swiffle.app.evidence.evidenceResult
+import com.swiffle.app.theme.SwiffleTheme
 import com.swiffle.app.theme.GoogleSans
 import com.swiffle.app.ui.canvas.links.PdfLinkEngine
 import com.swiffle.app.ui.canvas.links.M3MultiTabBrowserOverlay
@@ -1672,8 +1679,36 @@ fun PdfCanvasScreen(
     var currentPage by remember { mutableIntStateOf(1) }
 
     var jumpHistory by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var clipPage by rememberSaveable(pdfUri) { mutableIntStateOf(0) }
+    var savingEvidence by remember(pdfUri) { mutableStateOf(false) }
+    val evidenceStore = remember { EvidenceStore.from(context) }
+    val highlightStore = remember { PdfReaderHighlights(context) }
+    var readerHighlights by remember(pdfUri) { mutableStateOf(highlightStore.read(pdfUri)) }
+
+    fun addEvidence(capture: EvidenceCapture) {
+        if (savingEvidence) return
+        savingEvidence = true
+        scope.launch {
+            try {
+                val result = evidenceResult { evidenceStore.capture(pdfUri, pdfTitle, capture) }
+                result.onSuccess { pack ->
+                    clipPage = 0
+                    selectionController.clearSelection()
+                    android.widget.Toast.makeText(context, "Added to ${pack.title}", android.widget.Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    android.widget.Toast.makeText(context, it.message ?: "Unable to save this excerpt.", android.widget.Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                savingEvidence = false
+            }
+        }
+    }
 
     
+
+    if (clipPage > 0) {
+        EvidenceRegionDialog(pdfUri, clipPage, savingEvidence, { clipPage = 0 }, ::addEvidence)
+    }
 
     // --- God Voice TTS State (Lazy Initialized) ---
 
@@ -5348,6 +5383,7 @@ fun PdfCanvasScreen(
 
                             // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+                            drawReaderHighlights(readerHighlights, i + 1, pageLeftAt1x, pageTopAt1x, pageWidthAt1x, curPageHeight)
                             val activeSelection = selectionController.currentSelection
                             if (activeSelection != null && activeSelection.pageNum == i + 1 && activeSelection.rects.isNotEmpty()) {
 
@@ -5908,6 +5944,7 @@ fun PdfCanvasScreen(
 
                             // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
+                            drawReaderHighlights(readerHighlights, i + 1, 0f, 0f, pageWidthAt1x, curPageHeight)
                             val activeSelection = selectionController.currentSelection
                             if (activeSelection != null && activeSelection.pageNum == i + 1 && activeSelection.rects.isNotEmpty()) {
 
@@ -6390,6 +6427,16 @@ fun PdfCanvasScreen(
         }
     }
 
+        val askCurrentPage: () -> Unit = {
+            val pageText = try {
+                if (pdfNativePtr != 0L && currentPage > 0) {
+                    PageGeometryCache.getOrLoad(currentPage, pdfNativePtr).text
+                } else ""
+            } catch (_: Exception) { "" }
+            askSwiffleText = pageText
+            showAskSwiffleSheet = true
+        }
+
         PdfHeaderToolbar(
 
             pdfTitle = pdfTitle,
@@ -6443,15 +6490,9 @@ fun PdfCanvasScreen(
 
             },
 
-            onOpenAskSwiffle = {
-                val pageText = try {
-                    if (pdfNativePtr != 0L && currentPage > 0) {
-                        PageGeometryCache.getOrLoad(currentPage, pdfNativePtr).text
-                    } else ""
-                } catch (_: Exception) { "" }
-                askSwiffleText = pageText
-                showAskSwiffleSheet = true
-            },
+            onClipPage = { clipPage = currentPage },
+            onOpenEvidencePacks = { EvidencePacksActivity.open(context) },
+            onOpenAskSwiffle = askCurrentPage,
 
             isEditMode = isEditModeActive,
             hasUnsavedEdits = editableObjects.any { it.isMovedOrModified } || inpaintedPatches.isNotEmpty(),
@@ -6630,6 +6671,7 @@ fun PdfCanvasScreen(
             onOpenTtsSheet = { godVoiceState = 2 },
             onOpenThumbnails = { showThumbnails = true },
             onOpenJumpSheet = { showGoToPageDialog = true },
+            onAsk = askCurrentPage,
             modifier = Modifier.align(Alignment.BottomCenter).zIndex(5f)
         )
 
@@ -6710,6 +6752,7 @@ fun PdfCanvasScreen(
 
         if (activeSelection != null && activeSelection.rects.isNotEmpty() && draggingHandle == null) {
 
+            val selectionColors = SwiffleTheme.colors
             val selPage = activeSelection.pageNum - 1
 
             val pageTopAt1x = getPageTopAt1x(selPage)
@@ -6731,6 +6774,20 @@ fun PdfCanvasScreen(
             val ptsToPxY = if (curPtsHeight > 0f) (curPageHeight / curPtsHeight) * scale else scale
 
 
+
+            val selectedRegions = remember(activeSelection, curPtsWidth, curPtsHeight, pdfNativePtr) {
+                if (curPtsWidth > 0f && curPtsHeight > 0f) {
+                    NativeSelectionEngine.clusterToLineRects(activeSelection.rects).mapNotNull { rect ->
+                        EvidenceBounds.between(
+                            rect.left / curPtsWidth, rect.top / curPtsHeight,
+                            rect.right / curPtsWidth, rect.bottom / curPtsHeight
+                        ).takeIf { it.width > 0f && it.height > 0f }
+                    }
+                } else emptyList()
+            }
+            val savedHighlight = readerHighlights.firstOrNull {
+                it.page == activeSelection.pageNum && it.start == activeSelection.startIndex && it.end == activeSelection.endIndex
+            }
 
             val minX = activeSelection.rects.minOf { it.x }
 
@@ -6794,7 +6851,7 @@ fun PdfCanvasScreen(
 
                     shape = RoundedCornerShape(24.dp),
 
-                    color = if (isDark) Color(0xFF25232A) else Color.White,
+                    color = selectionColors.surfaceContainerHigh,
 
                     tonalElevation = 6.dp,
 
@@ -6802,7 +6859,7 @@ fun PdfCanvasScreen(
 
                         0.5.dp,
 
-                        if (isDark) Color(0xFF49454F) else Color(0xFFE6E0E9)
+                        selectionColors.borderDefault
 
                     )
 
@@ -6819,64 +6876,7 @@ fun PdfCanvasScreen(
                         val detectedUrl = remember(activeSelection.text) {
                             PdfLinkEngine.extractFirstUrl(activeSelection.text)
                         }
-
-                        if (detectedUrl != null) {
-                            val linkColor = if (isDark) Color(0xFF8AB4F8) else Color(0xFF1A73E8)
-                            TextButton(
-                                onClick = {
-                                    browserTabManager.openUrl(context, detectedUrl)
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    selectionController.clearSelection()
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = "Open Link",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = linkColor
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    "Open Link",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    fontFamily = GoogleSans,
-                                    color = linkColor
-                                )
-                            }
-
-                            // Divider
-                            Box(Modifier.width(1.dp).height(18.dp).background(if (isDark) Color(0xFF49454F) else Color(0xFFE0E0E0)))
-                        }
-
-                        // 0. Chameleon Lossless Text Edit Action
-                        TextButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectionController.clearSelection()
-                                isEditModeActive = true
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Edit Text",
-                                modifier = Modifier.size(16.dp),
-                                tint = Color(0xFF0078D4)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "Edit Text",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans,
-                                color = Color(0xFF0078D4)
-                            )
-                        }
-
-                        // Divider
-                        Box(Modifier.width(1.dp).height(18.dp).background(if (isDark) Color(0xFF49454F) else Color(0xFFE0E0E0)))
+                        val actionAccent = selectionColors.primaryAccent
 
                         // 1. Copy Action
                         TextButton(
@@ -6889,134 +6889,38 @@ fun PdfCanvasScreen(
                             },
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp), tint = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20))
+                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp), tint = selectionColors.textPrimary)
                             Spacer(Modifier.width(6.dp))
-                            Text("Copy", fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSans, color = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20))
+                            Text("Copy", fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSans, color = selectionColors.textPrimary)
                         }
 
-                        // Divider
-                        Box(Modifier.width(1.dp).height(18.dp).background(if (isDark) Color(0xFF49454F) else Color(0xFFE0E0E0)))
-
-                        // 2. Select all Action
                         TextButton(
+                            enabled = selectedRegions.isNotEmpty(),
                             onClick = {
-                                val page = activeSelection.pageNum
-                                val pageModel = PageTextModelCache.getOrBuild(page, pdfNativePtr)
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                selectionController.selectAll(page, pageModel)
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-
-                            Icon(Icons.Filled.SelectAll, contentDescription = "Select all", modifier = Modifier.size(16.dp), tint = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20))
-
-                            Spacer(Modifier.width(6.dp))
-
-                            Text("Select all", fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = GoogleSans, color = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20))
-
-                        }
-
-
-
-                        // Divider
-
-                        Box(Modifier.width(1.dp).height(18.dp).background(if (isDark) Color(0xFF49454F) else Color(0xFFE0E0E0)))
-
-
-
-                        // 3. Ask Swiffle Action (Clean purple text & icon, NO background overlay)
-
-                        val askSwifflePurple = if (isDark) Color(0xFFD0BCFF) else Color(0xFF7C4DFF)
-
-                        TextButton(
-
-                            onClick = {
-                                val trimmed = activeSelection.text.trim()
-                                askSwiffleText = trimmed
-                                selectionController.clearSelection()
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-
-                                // Direct intelligence into Floating AI Suggestion Cloud
-                                floatingAiPrompt = trimmed
-                                floatingAiIsThinking = true
-                                floatingAiThinkingStatus = "Analyzing document..."
-                                floatingAiAnswer = null
-
-                                val aiEngine = SwiffleAiEngine(context)
-                                scope.launch {
-                                    try {
-                                        var accumulatedReasoning = ""
-                                        var accumulatedContent = ""
-                                        aiEngine.query(
-                                            userPrompt = "Provide a clean, concise, 1-line definition or simple explanation of the following text: \"$trimmed\"",
-                                            documentContext = trimmed,
-                                            task = SwiffleAiTask.Explain
-                                        ).collect { event ->
-                                            when (event) {
-                                                is SwiffleAiStreamEvent.Thinking -> {
-                                                    accumulatedReasoning += event.text
-                                                    val phase = computeCrispThinkingPhase(accumulatedReasoning, trimmed)
-                                                    if (phase.isNotBlank()) {
-                                                        floatingAiThinkingStatus = phase
-                                                    }
-                                                }
-                                                is SwiffleAiStreamEvent.Token -> {
-                                                    floatingAiIsThinking = false
-                                                    accumulatedContent += event.text
-                                                    floatingAiAnswer = accumulatedContent.trim()
-                                                }
-                                                is SwiffleAiStreamEvent.Completed -> {
-                                                    floatingAiIsThinking = false
-                                                }
-                                                is SwiffleAiStreamEvent.Error -> {
-                                                    floatingAiIsThinking = false
-                                                    if (floatingAiAnswer.isNullOrBlank()) {
-                                                        floatingAiAnswer = "Analysis ready: Tap to explore complete document insights."
-                                                    }
-                                                }
-                                                else -> Unit
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        floatingAiIsThinking = false
-                                        if (floatingAiAnswer.isNullOrBlank()) {
-                                            floatingAiAnswer = "Tap to open Swiffle AI and explore this section."
-                                        }
-                                    }
+                                readerHighlights = if (savedHighlight != null) {
+                                    readerHighlights - savedHighlight
+                                } else {
+                                    readerHighlights + PdfReaderHighlight(
+                                        activeSelection.pageNum, activeSelection.startIndex, activeSelection.endIndex, selectedRegions
+                                    )
                                 }
+                                highlightStore.write(pdfUri, readerHighlights)
+                                selectionController.clearSelection()
                             },
-
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-
-                            colors = ButtonDefaults.textButtonColors(
-
-                                containerColor = Color.Transparent,
-
-                                contentColor = askSwifflePurple
-
-                            ),
-
-                            shape = RoundedCornerShape(16.dp),
-
-                            modifier = Modifier.padding(horizontal = 2.dp)
-
+                            contentPadding = PaddingValues(horizontal = 8.dp)
                         ) {
-
-                            Icon(Icons.Filled.AutoAwesome, contentDescription = "Ask Swiffle", modifier = Modifier.size(15.dp), tint = askSwifflePurple)
-
-                            Spacer(Modifier.width(6.dp))
-
-                            Text("Ask Swiffle", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = GoogleSans, color = askSwifflePurple)
-
+                            Text(if (savedHighlight == null) "Highlight" else "Unhighlight", color = actionAccent)
                         }
 
-
-
-                        // Divider
-
-                        Box(Modifier.width(1.dp).height(18.dp).background(if (isDark) Color(0xFF49454F) else Color(0xFFE0E0E0)))
-
-
+                        TextButton(
+                            enabled = !savingEvidence && selectedRegions.isNotEmpty() && activeSelection.text.isNotBlank(),
+                            onClick = {
+                                addEvidence(EvidenceCapture(activeSelection.pageNum, selectedRegions, activeSelection.text.trim()))
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text(if (savingEvidence) "Saving…" else "Add to pack", color = actionAccent)
+                        }
 
                         // 4. 3 Dots Overflow
 
@@ -7026,7 +6930,7 @@ fun PdfCanvasScreen(
 
                                 onClick = { showSelectionOverflow = true },
 
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(44.dp)
 
                             ) {
 
@@ -7036,7 +6940,7 @@ fun PdfCanvasScreen(
 
                                     contentDescription = "More options",
 
-                                    tint = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20),
+                                    tint = selectionColors.textPrimary,
 
                                     modifier = Modifier.size(20.dp)
 
@@ -7049,10 +6953,96 @@ fun PdfCanvasScreen(
                             DropdownMenu(
                                 expanded = showSelectionOverflow,
                                 onDismissRequest = { showSelectionOverflow = false },
-                                modifier = Modifier.background(if (isDark) Color(0xFF141414) else Color(0xFFFFFFFF)),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x18000000))
+                                containerColor = selectionColors.surfaceContainerHigh,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, selectionColors.borderDefault)
                             ) {
+
+                                DropdownMenuItem(
+                                    text = { Text("Ask Swiffle", color = actionAccent) },
+                                    onClick = {
+                                        showSelectionOverflow = false
+                                        val trimmed = activeSelection.text.trim()
+                                        askSwiffleText = trimmed
+                                        selectionController.clearSelection()
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                        // Direct intelligence into Floating AI Suggestion Cloud
+                                        floatingAiPrompt = trimmed
+                                        floatingAiIsThinking = true
+                                        floatingAiThinkingStatus = "Analyzing document..."
+                                        floatingAiAnswer = null
+
+                                        val aiEngine = SwiffleAiEngine(context)
+                                        scope.launch {
+                                            try {
+                                                var accumulatedReasoning = ""
+                                                var accumulatedContent = ""
+                                                aiEngine.query(
+                                                    userPrompt = "Provide a clean, concise, 1-line definition or simple explanation of the following text: \"$trimmed\"",
+                                                    documentContext = trimmed,
+                                                    task = SwiffleAiTask.Explain
+                                                ).collect { event ->
+                                                    when (event) {
+                                                        is SwiffleAiStreamEvent.Thinking -> {
+                                                            accumulatedReasoning += event.text
+                                                            val phase = computeCrispThinkingPhase(accumulatedReasoning, trimmed)
+                                                            if (phase.isNotBlank()) {
+                                                                floatingAiThinkingStatus = phase
+                                                            }
+                                                        }
+                                                        is SwiffleAiStreamEvent.Token -> {
+                                                            floatingAiIsThinking = false
+                                                            accumulatedContent += event.text
+                                                            floatingAiAnswer = accumulatedContent.trim()
+                                                        }
+                                                        is SwiffleAiStreamEvent.Completed -> {
+                                                            floatingAiIsThinking = false
+                                                        }
+                                                        is SwiffleAiStreamEvent.Error -> {
+                                                            floatingAiIsThinking = false
+                                                            if (floatingAiAnswer.isNullOrBlank()) {
+                                                                floatingAiAnswer = "Analysis ready: Tap to explore complete document insights."
+                                                            }
+                                                        }
+                                                        else -> Unit
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                floatingAiIsThinking = false
+                                                if (floatingAiAnswer.isNullOrBlank()) {
+                                                    floatingAiAnswer = "Tap to open Swiffle AI and explore this section."
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Select all") },
+                                    onClick = {
+                                        showSelectionOverflow = false
+                                        val page = activeSelection.pageNum
+                                        selectionController.selectAll(page, PageTextModelCache.getOrBuild(page, pdfNativePtr))
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Edit text") },
+                                    onClick = {
+                                        showSelectionOverflow = false
+                                        selectionController.clearSelection()
+                                        isEditModeActive = true
+                                    }
+                                )
+                                if (detectedUrl != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Open link") },
+                                        onClick = {
+                                            showSelectionOverflow = false
+                                            browserTabManager.openUrl(context, detectedUrl)
+                                            selectionController.clearSelection()
+                                        }
+                                    )
+                                }
 
                                 DropdownMenuItem(
 
@@ -7068,7 +7058,7 @@ fun PdfCanvasScreen(
 
                                             fontWeight = FontWeight.Medium,
 
-                                            color = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20)
+                                            color = selectionColors.textPrimary
 
                                         )
 
@@ -7132,7 +7122,7 @@ fun PdfCanvasScreen(
 
                                             fontWeight = FontWeight.Medium,
 
-                                            color = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20)
+                                            color = selectionColors.textPrimary
 
                                         )
 
@@ -7146,7 +7136,7 @@ fun PdfCanvasScreen(
 
                                             contentDescription = null,
 
-                                            tint = if (isDark) Color(0xFFE6E0E9) else Color(0xFF1D1B20),
+                                            tint = selectionColors.textPrimary,
 
                                             modifier = Modifier.size(20.dp)
 

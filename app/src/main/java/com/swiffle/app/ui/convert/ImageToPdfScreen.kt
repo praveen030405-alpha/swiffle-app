@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +135,8 @@ data class ToolItem(
 fun ImageToPdfScreen(
     onBack: () -> Unit,
     onOpenPdf: (Uri, String) -> Unit = { _, _ -> },
-    vm: ConversionViewModel = viewModel()
+    vm: ConversionViewModel = viewModel(),
+    startWithScan: Boolean = false
 ) {
     val context = LocalContext.current
     val haptic  = LocalHapticFeedback.current
@@ -246,6 +248,18 @@ fun ImageToPdfScreen(
             currentScreen = HubScreen.SMART_SCAN_DOCS
         } else {
             Toast.makeText(context, "Camera permission required for document scanning", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    var openedFromScanShortcut by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(startWithScan) {
+        if (startWithScan && !openedFromScanShortcut) {
+            openedFromScanShortcut = true
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                currentScreen = HubScreen.SMART_SCAN_DOCS
+            } else {
+                cameraPermLauncher.launch(Manifest.permission.CAMERA)
+            }
         }
     }
 

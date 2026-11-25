@@ -21,8 +21,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -38,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.swiffle.app.theme.GoogleSans
+import com.swiffle.app.theme.SwiffleTheme
 
 /**
  * Official Windows 11 Fluent CommandBar Dock:
@@ -59,6 +63,7 @@ fun PdfBottomDock(
     onOpenTtsSheet: () -> Unit = {},
     onOpenThumbnails: () -> Unit,
     onOpenJumpSheet: () -> Unit,
+    onAsk: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val config = LocalConfiguration.current
@@ -89,11 +94,11 @@ fun PdfBottomDock(
         val startMargin = 16.dp + navBarStart
         val endMargin = 16.dp + navBarEnd
 
-        // Windows 11 Fluent Tokens
-        val commandBarBg = if (isDark) Color(0xFF141414) else Color(0xFFFFFFFF)
-        val specularBorder = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
-        val textPrimary = if (isDark) Color(0xFFF5F5F5) else Color(0xFF1A1A1A)
-        val textSecondary = if (isDark) Color(0xFFAAAAAA) else Color(0xFF666666)
+        val colors = SwiffleTheme.colors
+        val commandBarBg = colors.surfaceContainerLow
+        val specularBorder = colors.borderDefault
+        val textPrimary = colors.textPrimary
+        val textSecondary = colors.textSecondary
         val separatorColor = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
         val hoverPressBg = if (isDark) Color(0x1AFFFFFF) else Color(0x0A000000)
 
@@ -105,14 +110,14 @@ fun PdfBottomDock(
         ) {
             // Windows 11 Fluent CommandBar Container (8px corner radius, 1px contour border)
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.medium,
                 color = commandBarBg,
                 border = BorderStroke(1.dp, specularBorder),
                 shadowElevation = 8.dp,
                 modifier = Modifier
                     .shadow(
                         elevation = 8.dp,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.medium,
                         spotColor = Color.Black.copy(alpha = 0.22f),
                         ambientColor = Color.Black.copy(alpha = 0.08f)
                     )
@@ -139,7 +144,7 @@ fun PdfBottomDock(
                             .clickable(interactionSource = thumbInteraction, indication = null) {
                                 onOpenThumbnails()
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .heightIn(min = 48.dp).padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -187,7 +192,7 @@ fun PdfBottomDock(
                             .clickable(interactionSource = pageInteraction, indication = null) {
                                 onOpenJumpSheet()
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .heightIn(min = 48.dp).padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -232,14 +237,14 @@ fun PdfBottomDock(
                             .graphicsLayer { scaleX = editScale; scaleY = editScale }
                             .clip(RoundedCornerShape(4.dp))
                             .background(
-                                if (isEditMode) Color(0xFF0078D4)
+                                if (isEditMode) colors.primary
                                 else if (editPressed) hoverPressBg
                                 else Color.Transparent
                             )
                             .clickable(interactionSource = editInteraction, indication = null) {
                                 onToggleEditMode()
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .heightIn(min = 48.dp).padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -260,6 +265,11 @@ fun PdfBottomDock(
                                 color = if (isEditMode) Color.White else textPrimary
                             )
                         }
+                    }
+                    TextButton(onClick = onAsk, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = colors.primaryAccent, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Ask", color = colors.primaryAccent, fontSize = 12.sp)
                     }
                 }
             }

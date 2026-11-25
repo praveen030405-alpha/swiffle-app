@@ -13,8 +13,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,9 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -70,7 +66,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,16 +90,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.swiffle.app.R
 import com.swiffle.app.auth.OrigamiAuth
+import com.swiffle.app.evidence.EvidencePacksActivity
+import com.swiffle.app.evidence.EvidenceStore
 import com.swiffle.app.theme.ClaudeSans
 import com.swiffle.app.theme.ClaudeSerif
 import com.swiffle.app.theme.SwiffleMotion
 import com.swiffle.app.theme.ThemeManager
 import com.swiffle.app.ui.canvas.PdfCanvasScreen
 import com.swiffle.app.ui.canvas.PdfPreloader
+import com.swiffle.app.ui.canvas.PdfReaderHighlights
 import com.swiffle.app.ui.components.DarkVoidAmbientLightPulse
 import com.swiffle.app.ui.viewer.UniversalDocumentViewerScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -206,6 +204,7 @@ fun HomeScreen(
     externalPdfUri: Uri? = null,
     onConsumeExternalPdf: () -> Unit = {},
     onConvert: () -> Unit = {},
+    onScan: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAiChat: () -> Unit = {},
     onLogout: () -> Unit = {}
@@ -214,6 +213,18 @@ fun HomeScreen(
     val tokens = rememberHomeTokens(isDark)
 
     val context = LocalContext.current
+    val evidenceStore = remember { EvidenceStore.from(context) }
+    val evidenceLibrary by evidenceStore.library.collectAsState()
+    val readerHighlights = remember { PdfReaderHighlights(context) }
+    LaunchedEffect(evidenceStore) {
+        try {
+            evidenceStore.load()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // The packs screen handles and displays its own load errors.
+        }
+    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
@@ -578,18 +589,6 @@ fun HomeScreen(
                     }
                     val imeHeightDp = with(density) { imeBottomPx.toDp() }
                     val navBarHeightDp = with(density) { navBarBottomPx.toDp() }
-                    var isKeyboardOpen by remember { mutableStateOf(false) }
-
-                    LaunchedEffect(imeInsets, navigationBarInsets, density) {
-                        snapshotFlow {
-                            imeInsets.getBottom(density) > navigationBarInsets.getBottom(density)
-                        }
-                            .distinctUntilChanged()
-                            .collect { open ->
-                                isKeyboardOpen = open
-                            }
-                    }
-
                     LaunchedEffect(drawerState.targetValue) {
                         if (drawerState.targetValue == DrawerValue.Open) {
                             focusManager.clearFocus()
@@ -610,35 +609,6 @@ fun HomeScreen(
                                     keyboardController?.hide()
                                 })
                             },
-                        floatingActionButton = {
-                            Box(
-                                modifier = Modifier
-                                    .navigationBarsPadding()
-                                    .imePadding()
-                            ) {
-                                AnimatedVisibility(
-                                    visible = !isImeVisible,
-                                    enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.88f),
-                                    exit = fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.88f)
-                                ) {
-                                    ObsidianMorphicFab(
-                                        isCompact = isScrollingFast,
-                                        tokens = tokens,
-                                        forceCollapse = isKeyboardOpen,
-                                        onAddPdf = {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            pdfPickerLauncher.launch(SUPPORTED_DOC_MIME_TYPES)
-                                        },
-                                        onConvert = {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            onConvert()
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     ) { paddingValues ->
                         Box(
                             modifier = Modifier
@@ -675,15 +645,20 @@ fun HomeScreen(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // 2. Top-left "View all" + Swipeable Horizontal Tool Rectangle Cards
-                                ObsidianToolsCarouselSection(
-                                    tokens = tokens,
-                                    onOpenTools = {
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                        onConvert()
-                                    }
-                                )
+                                if (!isImeVisible && searchQuery.isBlank()) {
+                                    val latest = recentFiles.firstOrNull().takeIf { showRecentDocs }
+                                    val pack = evidenceLibrary?.activePack
+                                    HomeDocumentActions(
+                                        recentTitle = latest?.name,
+                                        packTitle = pack?.title,
+                                        onOpen = { pdfPickerLauncher.launch(SUPPORTED_DOC_MIME_TYPES) },
+                                        onScan = onScan,
+                                        onTools = onConvert,
+                                        onRecent = { latest?.let { selectedPdfData = it.uri to it.name } },
+                                        onPack = { pack?.let { EvidencePacksActivity.open(context, it.id) } },
+                                        onAllPacks = { EvidencePacksActivity.open(context) }
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -718,7 +693,7 @@ fun HomeScreen(
                                         else -> annotatedListState
                                     }
 
-                                    val pageFiles = remember(pageIndex, searchQuery, recentFiles, starredUris, showRecentDocs) {
+                                    val pageFiles = run {
                                         if (!showRecentDocs && pageIndex == 0 && searchQuery.isBlank()) {
                                             emptyList()
                                         } else {
@@ -730,7 +705,7 @@ fun HomeScreen(
                                             when (pageIndex) {
                                                 0 -> base
                                                 1 -> base.filter { starredUris.contains(it.uri.toString()) }
-                                                else -> emptyList()
+                                                else -> base.filter { readerHighlights.hasHighlights(it.uri) }
                                             }
                                         }
                                     }
@@ -738,7 +713,7 @@ fun HomeScreen(
                                     val listBottomPadding = if (isImeVisible) {
                                         maxOf(imeHeightDp, navBarHeightDp) + 16.dp
                                     } else {
-                                        navBarHeightDp + 104.dp
+                                        navBarHeightDp + 16.dp
                                     }
 
                                     LazyColumn(

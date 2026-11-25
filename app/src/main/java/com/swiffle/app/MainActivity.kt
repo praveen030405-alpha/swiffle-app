@@ -260,6 +260,7 @@ class MainActivity : ComponentActivity() {
                                   }
                                   else -> {
                                       var showConvert by remember { mutableStateOf(false) }
+                                      var startWithScan by remember { mutableStateOf(false) }
                                       var showSettings by remember { mutableStateOf(false) }
                                       var showAiChat by remember { mutableStateOf(false) }
                                       var activePdfUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -299,6 +300,7 @@ class MainActivity : ComponentActivity() {
                                               "convert" -> {
                                                   com.swiffle.app.ui.convert.ImageToPdfScreen(
                                                       onBack = { showConvert = false },
+                                                      startWithScan = startWithScan,
                                                       onOpenPdf = { uri, _ ->
                                                           activePdfUri = uri
                                                           showConvert = false
@@ -337,7 +339,8 @@ class MainActivity : ComponentActivity() {
                                                   com.swiffle.app.ui.home.HomeScreen(
                                                       externalPdfUri = activePdfUri ?: externalPdfUri,
                                                       onConsumeExternalPdf = { activePdfUri = null },
-                                                      onConvert = { showConvert = true },
+                                                      onConvert = { startWithScan = false; showConvert = true },
+                                                      onScan = { startWithScan = true; showConvert = true },
                                                       onOpenSettings = { showSettings = true },
                                                       onOpenAiChat = { showAiChat = true },
                                                       onLogout = {

@@ -121,6 +121,8 @@
                 <data android:pathPattern=".*\\.htm" />
             </intent-filter>
         </activity>
+        <activity android:name=".evidence.EvidencePacksActivity" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
