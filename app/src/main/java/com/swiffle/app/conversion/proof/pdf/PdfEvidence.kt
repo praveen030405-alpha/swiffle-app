@@ -1,5 +1,6 @@
 package com.swiffle.app.conversion.proof.pdf
 
+import com.swiffle.app.conversion.MarkdownIpPrivacy
 import com.swiffle.app.conversion.PdfVectorRulingExtractor
 import com.swiffle.app.conversion.LatticeTableRegion
 import com.swiffle.app.conversion.proof.core.*
@@ -19,7 +20,14 @@ internal fun layoutPage(page: Int, positions: List<Position>, tables: List<Latti
     val digest = ProvenanceDigest()
     val slots = mutableMapOf<Slot,MutableList<Position>>()
     val outside = mutableListOf<Position>()
-    for (pos in positions) {
+    val safeText = mutableMapOf<String,String>()
+    for (line in positions.groupBy { it.y }.values) {
+        val sorted = line.sortedBy { it.x }
+        val pieces = MarkdownIpPrivacy.redactPieces(sorted.map { it.text })
+        sorted.forEachIndexed { i, glyph -> if (glyph.text != pieces[i]) safeText[glyph.id] = pieces[i] }
+    }
+    for (original in positions) {
+        val pos = safeText[original.id]?.let { original.copy(text = it) } ?: original
         val cx = pos.x + pos.width / 2
         val cy = pos.y - pos.height / 2
         var match: Slot? = null

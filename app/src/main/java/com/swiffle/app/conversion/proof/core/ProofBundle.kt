@@ -1,5 +1,6 @@
 package com.swiffle.app.conversion.proof.core
 
+import com.swiffle.app.conversion.MarkdownIpPrivacy
 import java.io.File
 import java.math.BigDecimal
 import java.security.MessageDigest
@@ -36,6 +37,16 @@ data class Cell(
             CellType.TEXT, CellType.ERROR -> require(valueTyped != null)
         }
     }
+}
+
+private fun Cell.forMarkdown(): Cell {
+    val clean = MarkdownIpPrivacy::redact
+    val pieces = MarkdownIpPrivacy.redactPieces(tokens.map { it.text })
+    return copy(id = clean(id), sourceRegion = clean(sourceRegion), section = clean(section),
+        rowLabel = clean(rowLabel), columnKey = clean(columnKey), valueRaw = valueRaw?.let(clean),
+        valueTyped = if (type == CellType.TEXT || type == CellType.ERROR) valueTyped?.let(clean) else valueTyped,
+        displayText = clean(displayText), formula = formula?.let(clean), cachedValue = cachedValue?.let(clean),
+        tokens = tokens.mapIndexed { i, token -> token.copy(text = pieces[i]) })
 }
 
 @Serializable
@@ -95,7 +106,7 @@ object ProofBundle {
                             val row = stream.next()
                             require(row.isNotEmpty())
                             for (cell in row) {
-                                val encoded = json.encodeToString(cell)
+                                val encoded = json.encodeToString(cell.forMarkdown())
                                 side.appendLine(encoded)
                                 out.appendLine(encoded)
                                 count++

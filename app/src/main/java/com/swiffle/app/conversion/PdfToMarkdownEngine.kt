@@ -416,7 +416,7 @@ object PdfToMarkdownEngine {
                             usedAnchors = usedAnchors
                         )
 
-                        tocEntries.addAll(pageConv.headings)
+                        tocEntries.addAll(pageConv.headings.map { entry -> entry.copy(title = MarkdownIpPrivacy.redact(entry.title), anchor = MarkdownIpPrivacy.redact(entry.anchor)) })
                         allDetectedWatermarks.addAll(pageConv.detectedWatermarks)
                         totalHeadings += pageConv.headings.size
                         totalTables += pageConv.tableCount
@@ -430,7 +430,7 @@ object PdfToMarkdownEngine {
                             } else if (index > 0 && pageConv.markdown.isNotBlank()) {
                                 append("\n\n")
                             }
-                            append(pageConv.markdown)
+                            append(MarkdownIpPrivacy.redact(pageConv.markdown))
                         }
 
                         if (pageMarkdown.isNotEmpty()) {
@@ -531,7 +531,7 @@ object PdfToMarkdownEngine {
                         }
                         append("\n---\n\n")
                     }
-                }
+                }.let(MarkdownIpPrivacy::redact)
 
                 // Stream preamble + disk-backed body into final file (zero heap blowup)
                 BufferedOutputStream(FileOutputStream(finalOutputFile), 65_536).use { out ->
