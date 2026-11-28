@@ -1,6 +1,8 @@
 package com.swiffle.app.ui.convert
 
 import android.net.Uri
+import android.provider.OpenableColumns
+import com.swiffle.app.conversion.proof.excel.csvRows
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.*
@@ -22,7 +24,7 @@ internal fun ConversionEvidenceCard() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<File?>(null) }
-    var status by remember { mutableStateOf("Inspect PDF text positions or stored XLSX cell values offline. This preview checks bundle integrity. Source fidelity and AI readability are unmeasured.") }
+    var status by remember { mutableStateOf("Inspect PDF text positions, stored XLSX values or CSV fields offline. This preview checks bundle integrity. Source fidelity and AI readability are unmeasured.") }
     var busy by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
         onDispose { result?.deleteRecursively() }
@@ -51,6 +53,8 @@ internal fun ConversionEvidenceCard() {
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) scope.launch {
             busy = true
+            result?.deleteRecursively()
+            result = null
             status = "Reading local document…"
             var stage: File? = null
             try {
@@ -65,6 +69,8 @@ internal fun ConversionEvidenceCard() {
                     val rows = if (header.contentEquals("%PDF-".toByteArray())) {
                         PDFBoxResourceLoader.init(ctx.applicationContext)
                         pdfRows(source)
+                    } else if (ctx.contentResolver.getType(uri) == "text/csv" || ctx.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { it.moveToFirst() && it.getString(0).endsWith(".csv",true) } == true) {
+                        csvRows(source)
                     } else {
                         require(header[0] == 80.toByte() && header[1] == 75.toByte()) { "Select a PDF or XLSX file" }
                         workbookRows(source,dir)
@@ -86,8 +92,8 @@ internal fun ConversionEvidenceCard() {
     }
     Text("Conversion evidence preview",style = MaterialTheme.typography.titleMedium)
     Text(status)
-    OutlinedButton(enabled = !busy,onClick = { pick.launch(arrayOf("application/pdf","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) }) {
-        Text("Inspect PDF or Excel")
+    OutlinedButton(enabled = !busy,onClick = { pick.launch(arrayOf("text/csv","text/comma-separated-values","application/pdf","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) }) {
+        Text("Inspect PDF, Excel or CSV")
     }
     if (result != null) OutlinedButton(enabled = !busy,onClick = { save.launch("Swiffle-evidence.zip") }) {
         Text("Verify and export evidence")
