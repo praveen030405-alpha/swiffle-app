@@ -53,7 +53,7 @@ sealed class MarkdownBlock {
     data class Paragraph(val text: String) : MarkdownBlock()
     data class CodeBlock(val code: String, val lang: String = "") : MarkdownBlock()
     data class BulletItem(val text: String) : MarkdownBlock()
-    data class Table(val headers: List<String>, val rows: List<List<String>>) : MarkdownBlock()
+    data class Table(val lines: List<String>) : MarkdownBlock()
     object Divider : MarkdownBlock()
 }
 
@@ -234,41 +234,7 @@ fun FluentMarkdownViewer(
                                         Spacer(modifier = Modifier.height(8.dp))
                                     }
                                     is MarkdownBlock.Table -> {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .border(1.dp, strokeColor, RoundedCornerShape(4.dp))
-                                        ) {
-                                            // Header
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(accentPurple.copy(alpha = 0.12f))
-                                                    .border(0.5.dp, strokeColor)
-                                            ) {
-                                                block.headers.forEach { h ->
-                                                    Box(modifier = Modifier.weight(1f).padding(8.dp)) {
-                                                        Text(text = h, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                                    }
-                                                }
-                                            }
-                                            // Rows
-                                            block.rows.forEach { row ->
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .border(0.5.dp, strokeColor)
-                                                ) {
-                                                    row.forEach { c ->
-                                                        Box(modifier = Modifier.weight(1f).padding(8.dp)) {
-                                                            Text(text = c, fontSize = 11.sp, color = textPrimary)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        com.swiffle.app.ui.canvas.MarkdownTableCard(block.lines, isDark)
                                     }
                                     MarkdownBlock.Divider -> {
                                         Box(
@@ -298,8 +264,21 @@ private fun parseMarkdown(rawText: String): List<MarkdownBlock> {
     var codeBuffer = StringBuilder()
     var codeLang = ""
 
-    for (line in lines) {
+    var index = 0
+    while (index < lines.size) {
+        val line = lines[index++]
         val trimmed = line.trim()
+        if (!inCodeBlock && trimmed.startsWith("|") && trimmed.count { it == '|' } >= 2) {
+            val table = mutableListOf(trimmed)
+            while (index < lines.size) {
+                val next = lines[index].trim()
+                if (!next.startsWith("|") || next.count { it == '|' } < 2) break
+                table += next
+                index++
+            }
+            blocks.add(MarkdownBlock.Table(table))
+            continue
+        }
 
         if (trimmed.startsWith("```")) {
             if (inCodeBlock) {

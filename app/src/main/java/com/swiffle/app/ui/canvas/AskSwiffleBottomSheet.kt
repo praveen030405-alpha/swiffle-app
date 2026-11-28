@@ -1505,7 +1505,7 @@ internal fun RichMarkdownBody(
 
                 Text(
                     text = cleanMarkdownAsterisks(headerClean),
-                    fontFamily = GoogleSans,
+                    fontFamily = com.swiffle.app.theme.ClaudeSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = if (isH1) 20.sp else if (isH2) 17.5.sp else 16.sp,
                     lineHeight = if (isH1) 26.sp else if (isH2) 23.sp else 21.sp,
@@ -1801,237 +1801,78 @@ internal fun cleanMarkdownAsterisks(raw: String): String {
  * high-contrast header typography, subtle horizontal dividers, and smooth horizontal scrolling.
  */
 @Composable
-internal fun MarkdownTableCard(
-    tableLines: List<String>,
-    isDark: Boolean
-) {
-    // 1. Robust Markdown Table Extraction & Alignment Parser
-    val parsedData = remember(tableLines) {
-        val cleanRows = mutableListOf<List<String>>()
-        var detectedAlignments = listOf<TextAlign>()
-
-        for (rawLine in tableLines) {
-            val trimmed = rawLine.trim()
-            if (trimmed.isEmpty()) continue
-
-            // Strip outer pipes safely without removing internal content
-            val inner = trimmed
-                .removePrefix("|")
-                .removeSuffix("|")
-            val cells = inner.split("|").map { it.trim() }
-
-            // Detect if this line is the markdown alignment delimiter row (| :--- | :---: | ---: |)
-            val isSeparatorRow = cells.isNotEmpty() && cells.all { cell ->
-                val stripped = cell.replace(":", "").replace("-", "").trim()
-                stripped.isEmpty()
-            }
-
-            if (isSeparatorRow) {
-                detectedAlignments = cells.map { cell ->
-                    val startsWithColon = cell.startsWith(":")
-                    val endsWithColon = cell.endsWith(":")
-                    when {
-                        startsWithColon && endsWithColon -> TextAlign.Center
-                        endsWithColon -> TextAlign.End
-                        else -> TextAlign.Start
-                    }
-                }
-            } else if (cells.isNotEmpty() && cells.any { it.isNotBlank() }) {
-                cleanRows.add(cells)
-            }
+internal fun MarkdownTableCard(tableLines: List<String>, isDark: Boolean) {
+    val parsed = remember(tableLines) {
+        tableLines.map { line ->
+            line.trim().removePrefix("|").removeSuffix("|")
+                .split(Regex("""(?<!\\)\|""")).map { it.trim().replace("\\|", "|") }
         }
-        Pair(cleanRows, detectedAlignments)
     }
-
-    val rows = parsedData.first
-    val parsedAlignments = parsedData.second
-    if (rows.isEmpty()) return
-
-    val rawHeaders = rows.first()
-    val colCount = rawHeaders.size
-    val headers = rawHeaders
-
-    // Normalize all data rows to have exact colCount cells (pad missing with empty string)
-    val dataRows = remember(rows) {
-        rows.drop(1).map { r ->
-            if (r.size < colCount) {
-                r + List(colCount - r.size) { "" }
-            } else {
-                r.take(colCount)
+    if (parsed.isEmpty()) return
+    val delimiter = parsed.getOrNull(1)?.takeIf { row -> row.all { it.matches(Regex(":?-+:?")) } }
+    val rows = if (delimiter == null) parsed else listOf(parsed.first()) + parsed.drop(2)
+    val columns = rows.maxOf { it.size }
+    val numeric = remember { Regex("""[+−(\-]?[₹$€£]?\s*\d[\d,.\s]*[%)]?""") }
+    val align = remember(parsed) {
+        List(columns) { i ->
+            val spec = delimiter?.getOrNull(i).orEmpty()
+            val values = rows.drop(1).mapNotNull { it.getOrNull(i)?.trim('*') }.filter { it.isNotBlank() }
+            when {
+                spec.startsWith(':') && spec.endsWith(':') -> TextAlign.Center
+                spec.endsWith(':') -> TextAlign.End
+                spec.startsWith(':') -> TextAlign.Start
+                values.isNotEmpty() && values.all(numeric::matches) -> TextAlign.End
+                else -> TextAlign.Start
             }
         }
     }
-
-    val columnAlignments = remember(parsedAlignments, colCount) {
-        if (parsedAlignments.size >= colCount) parsedAlignments
-        else parsedAlignments + List(colCount - parsedAlignments.size) { TextAlign.Start }
-    }
-
-    val scrollState = rememberScrollState()
-
-    // Dynamically compute optimal min-width per column based on cell text lengths
-    val columnWidths = remember(rows, colCount) {
-        val widths = MutableList(colCount) { 110.dp }
-        for (c in 0 until colCount) {
-            var maxLen = headers.getOrNull(c)?.length ?: 0
-            for (r in dataRows) {
-                val cellLen = r.getOrNull(c)?.length ?: 0
-                if (cellLen > maxLen) maxLen = cellLen
-            }
-            val calculated = when {
-                maxLen <= 6 -> 85.dp
-                maxLen <= 14 -> 120.dp
-                maxLen <= 26 -> 155.dp
-                maxLen <= 40 -> 190.dp
-                else -> 230.dp
-            }
-            widths[c] = calculated
+    val ink = if (isDark) Color(0xFFF6F4EF) else Color(0xFF181A1D)
+    val rule = if (isDark) Color(0xFF42454B) else Color(0xFFDADDE1)
+    val context = LocalContext.current
+    var copied by remember(tableLines) { mutableStateOf(false) }
+    LaunchedEffect(copied) { if (copied) { kotlinx.coroutines.delay(1600); copied = false } }
+    val natural = remember(parsed) {
+        List(columns) { i ->
+            val longest = rows.maxOf { it.getOrNull(i)?.length ?: 0 }
+            (longest.coerceAtMost(30) * 8 + 20).coerceIn(64, 232).dp
         }
-
-        // Proportional expansion: if total table width is less than ~330dp (standard mobile card content width),
-        // distribute remaining width across columns so the table fills the card cleanly instead of leaving dead space
-        val totalCalculated = widths.sumOf { it.value.toDouble() }
-        val minTargetWidth = 330.0
-        if (totalCalculated < minTargetWidth && colCount > 0) {
-            val extraPerCol = ((minTargetWidth - totalCalculated) / colCount).toFloat()
-            for (i in 0 until colCount) {
-                widths[i] = (widths[i].value + extraPerCol).dp
-            }
-        }
-        widths
     }
-
-    val cardBorder = if (isDark) Color(0xFF383347) else Color(0xFFD4CFE2)
-    val headerBg = if (isDark) Color(0xFF221F2F) else Color(0xFFEDE9F7)
-    val headerTextColor = if (isDark) Color(0xFFF3EEFC) else Color(0xFF1E1A29)
-    val dividerColor = if (isDark) Color(0xFF2E2A3C) else Color(0xFFE2DEEE)
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (isDark) Color(0xFF14131C) else Color(0xFFFAFAFE),
-        border = BorderStroke(1.dp, cardBorder),
-        shadowElevation = 1.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp)
-    ) {
-        // Horizontally Scrollable Table Grid
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState)
-        ) {
-            Column(
-                modifier = Modifier.width(IntrinsicSize.Max)
-            ) {
-                // Enterprise Header Row with continuous vertical dividers
-                Row(
-                    modifier = Modifier
-                        .background(headerBg)
-                        .height(IntrinsicSize.Min)
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    headers.forEachIndexed { i, header ->
-                        val colWidth = columnWidths.getOrElse(i) { 120.dp }
-                        val alignment = columnAlignments.getOrElse(i) { TextAlign.Start }
-                        Box(
-                            modifier = Modifier
-                                .width(colWidth)
-                                .padding(horizontal = 12.dp),
-                            contentAlignment = when (alignment) {
-                                TextAlign.Center -> Alignment.Center
-                                TextAlign.End -> Alignment.CenterEnd
-                                else -> Alignment.CenterStart
-                            }
-                        ) {
-                            Text(
-                                text = cleanMarkdownAsterisks(header).uppercase(),
-                                fontFamily = GoogleSans,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                letterSpacing = 0.5.sp,
-                                color = headerTextColor,
-                                textAlign = alignment,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        if (i < headers.size - 1) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(1.dp)
-                                    .background(dividerColor)
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(
-                    color = cardBorder,
-                    thickness = 1.2.dp
-                )
-
-                // Enterprise Data Rows with alternating zebra fills & vertical dividers
-                dataRows.forEachIndexed { rowIndex, rowCols ->
-                    val isEven = rowIndex % 2 == 0
-                    val rowBg = if (isDark) {
-                        if (isEven) Color(0xFF14131C) else Color(0xFF1A1824)
-                    } else {
-                        if (isEven) Color(0xFFFAFAFE) else Color(0xFFF4F2F9)
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .background(rowBg)
-                            .height(IntrinsicSize.Min)
-                            .padding(vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        for (colIndex in 0 until colCount) {
-                            val col = rowCols.getOrElse(colIndex) { "" }
-                            val colWidth = columnWidths.getOrElse(colIndex) { 120.dp }
-                            val alignment = columnAlignments.getOrElse(colIndex) { TextAlign.Start }
-                            Box(
-                                modifier = Modifier
-                                    .width(colWidth)
-                                    .padding(horizontal = 12.dp),
-                                contentAlignment = when (alignment) {
-                                    TextAlign.Center -> Alignment.Center
-                                    TextAlign.End -> Alignment.CenterEnd
-                                    else -> Alignment.CenterStart
-                                }
-                            ) {
-                                Text(
-                                    text = parseMarkdownAnnotatedString(col, isDark),
-                                    fontFamily = GoogleSans,
-                                    fontWeight = if (colIndex == 0) FontWeight.SemiBold else FontWeight.Normal,
-                                    fontSize = 12.5.sp,
-                                    lineHeight = 17.sp,
-                                    textAlign = alignment,
-                                    color = if (isDark) Color(0xFFE5E0EE) else Color(0xFF2B2836)
-                                )
-                            }
-                            if (colIndex < colCount - 1) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .width(1.dp)
-                                        .background(dividerColor.copy(alpha = 0.5f))
-                                )
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val minWidth = natural.fold(0.dp) { a,b -> a+b }
+            val extra = ((maxWidth-minWidth).coerceAtLeast(0.dp)) / columns
+            Column(Modifier.horizontalScroll(rememberScrollState())) {
+                Column(Modifier.width(minWidth + extra * columns)) {
+                    rows.forEachIndexed { r, cells ->
+                        val label = cells.firstOrNull { it.isNotBlank() }.orEmpty().trim('*',' ',':')
+                        val total = r > 0 && label.lowercase(java.util.Locale.ROOT) in listOf("total","grand total","subtotal","sub-total")
+                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            for (i in 0 until columns) {
+                                Text(text = parseMarkdownAnnotatedString(cells.getOrNull(i).orEmpty(),isDark),
+                                    modifier = Modifier.width(natural[i] + extra).padding(horizontal = 5.dp),
+                                    fontFamily = com.swiffle.app.theme.ClaudeSerif,
+                                    fontSize = 16.sp, lineHeight = 22.sp, textAlign = align[i],
+                                    fontWeight = if (r == 0 || total) FontWeight.Bold else FontWeight.Normal,
+                                    style = TextStyle(fontFeatureSettings = "tnum"), color = ink)
                             }
                         }
-                    }
-
-                    if (rowIndex < dataRows.size - 1) {
-                        HorizontalDivider(
-                            color = dividerColor.copy(alpha = 0.7f),
-                            thickness = 0.75.dp
-                        )
+                        HorizontalDivider(thickness = if (total) 2.dp else if (r == 0) 1.dp else 0.5.dp,
+                            color = if (total) ink else rule)
                     }
                 }
             }
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = {
+            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Swiffle table", tableLines.joinToString("\n")))
+            copied = true
+        }, modifier = Modifier.align(Alignment.CenterHorizontally).widthIn(min = 176.dp).heightIn(min = 48.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF174687), contentColor = Color.White)) {
+            Icon(if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy, null, Modifier.size(17.dp))
+            Spacer(Modifier.width(9.dp))
+            Text(if (copied) "Copied" else "Copy table",fontFamily = com.swiffle.app.theme.ClaudeSans)
         }
     }
 }
