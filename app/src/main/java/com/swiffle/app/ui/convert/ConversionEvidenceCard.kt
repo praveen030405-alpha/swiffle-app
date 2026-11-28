@@ -2,17 +2,13 @@ package com.swiffle.app.ui.convert
 
 import android.net.Uri
 import android.provider.OpenableColumns
-import com.swiffle.app.conversion.proof.excel.csvRows
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import com.swiffle.app.conversion.proof.core.ProofBundle
-import com.swiffle.app.conversion.proof.excel.workbookRows
-import com.swiffle.app.conversion.proof.pdf.pdfRows
+import com.swiffle.app.conversion.proof.SwiffleConverter
 import com.swiffle.app.conversion.proof.verify.VerifyBundle
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.*
 import java.io.File
 import java.nio.file.Files
@@ -65,21 +61,14 @@ internal fun ConversionEvidenceCard() {
                     requireNotNull(ctx.contentResolver.openInputStream(uri)).use { input ->
                         source.outputStream().use { input.copyTo(it) }
                     }
-                    val header = source.inputStream().use { val b = ByteArray(5); it.read(b); b }
-                    val rows = if (header.contentEquals("%PDF-".toByteArray())) {
-                        PDFBoxResourceLoader.init(ctx.applicationContext)
-                        pdfRows(source)
-                    } else if (ctx.contentResolver.getType(uri) == "text/csv" || ctx.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { it.moveToFirst() && it.getString(0).endsWith(".csv",true) } == true) {
-                        csvRows(source)
-                    } else {
-                        require(header[0] == 80.toByte() && header[1] == 75.toByte()) { "Select a PDF or XLSX file" }
-                        workbookRows(source,dir)
+                    val name = ctx.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use {
+                        if(it.moveToFirst()) it.getString(0) else null
                     }
                     val job = currentCoroutineContext()
-                    val memory = Runtime.getRuntime().maxMemory() / (1024 * 1024)
-                    val shardSize = (memory * 4).coerceIn(500L,2000L).toInt()
-                    val cert = ProofBundle.write(source,File(dir,"bundle"),rows.onEach { job.ensureActive() },shardSize)
-                    VerifyBundle.checkBundle(File(dir,"bundle"),source)
+                    val cert = SwiffleConverter.convert(ctx,source,dir,name,ctx.contentResolver.getType(uri)) { count ->
+                        job.ensureActive()
+                        if (count % 500L == 0L) scope.launch { status = "Inspecting source row or position " + count }
+                    }
                     "Round trip passed for " + cert.shards.sumOf { it.cells } + " extracted records. Source fidelity unverified. Merkle root " + cert.merkleRoot
                 }
                 result?.deleteRecursively()
