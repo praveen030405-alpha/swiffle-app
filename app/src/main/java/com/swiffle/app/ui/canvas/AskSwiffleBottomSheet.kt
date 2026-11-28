@@ -1828,9 +1828,6 @@ internal fun MarkdownTableCard(tableLines: List<String>, isDark: Boolean) {
     }
     val ink = if (isDark) Color(0xFFF6F4EF) else Color(0xFF181A1D)
     val rule = if (isDark) Color(0xFF42454B) else Color(0xFFDADDE1)
-    val context = LocalContext.current
-    var copied by remember(tableLines) { mutableStateOf(false) }
-    LaunchedEffect(copied) { if (copied) { kotlinx.coroutines.delay(1600); copied = false } }
     val natural = remember(parsed) {
         List(columns) { i ->
             val longest = rows.maxOf { it.getOrNull(i)?.length ?: 0 }
@@ -1861,18 +1858,6 @@ internal fun MarkdownTableCard(tableLines: List<String>, isDark: Boolean) {
                     }
                 }
             }
-        }
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = {
-            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("Swiffle table", tableLines.joinToString("\n")))
-            copied = true
-        }, modifier = Modifier.align(Alignment.CenterHorizontally).widthIn(min = 176.dp).heightIn(min = 48.dp),
-            shape = RoundedCornerShape(10.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF174687), contentColor = Color.White)) {
-            Icon(if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy, null, Modifier.size(17.dp))
-            Spacer(Modifier.width(9.dp))
-            Text(if (copied) "Copied" else "Copy table",fontFamily = com.swiffle.app.theme.ClaudeSans)
         }
     }
 }
