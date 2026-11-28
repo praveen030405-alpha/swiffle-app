@@ -5,7 +5,7 @@ import com.swiffle.app.conversion.proof.core.*
 import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import java.io.RandomAccessFile
-import java.security.MessageDigest
+import com.swiffle.app.conversion.proof.core.ProvenanceDigest
 import java.util.zip.ZipFile
 
 private fun XmlPullParser.attr(name: String) = getAttributeValue(null,name)
@@ -34,6 +34,7 @@ private class StringStore(dir: File) : java.io.Closeable {
 
 internal fun workbookRows(source: File, scratch: File,
     newParser: () -> XmlPullParser = { Xml.newPullParser() }): Sequence<List<Cell>> = sequence {
+    val digest = ProvenanceDigest()
     ZipFile(source).use { zip ->
         fun parser(input: java.io.InputStream) = newParser().apply { setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES,true); setInput(input,null) }
         fun entry(path: String) = requireNotNull(zip.getEntry(path)) { "Missing workbook part: " + path }
@@ -112,7 +113,7 @@ internal fun workbookRows(source: File, scratch: File,
                             }
                             val id = sheet + "!" + address
                             val evidence = listOf(path,address,kind,raw,formula,value).joinToString("") { v -> v?.let { it.length.toString() + ":" + it } ?: "-" }
-                            val hash = MessageDigest.getInstance("SHA-256").digest(evidence.toByteArray()).joinToString("") { "%02x".format(it) }
+                            val hash = digest.hash(evidence)
                             row += Cell(id,sheet,address,"worksheet","",column(address),
                                 if(kind == "inlineStr") value else raw, value,value ?: "∅",type,hash,formula,if(formula != null) raw else null)
                         }

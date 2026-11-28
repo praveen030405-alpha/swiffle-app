@@ -5,10 +5,11 @@ import java.io.File
 import java.io.PushbackReader
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import com.swiffle.app.conversion.proof.core.ProvenanceDigest
 
 // CSV has no declared numeric/date schema. Preserve leading zeros and date spellings as text.
 internal fun csvRows(source: File): Sequence<List<Cell>> = sequence {
+    val digest = ProvenanceDigest()
     PushbackReader(InputStreamReader(source.inputStream(),StandardCharsets.UTF_8.newDecoder()).buffered(),2).use { input ->
         val first = input.read()
         if (first >= 0 && first != 0xfeff) input.unread(first)
@@ -25,8 +26,7 @@ internal fun csvRows(source: File): Sequence<List<Cell>> = sequence {
             val address = col + rowNumber
             val raw = field.toString()
             val empty = !quoted && raw.isEmpty()
-            val hash = MessageDigest.getInstance("SHA-256").digest((address + ":" + quoted + ":" + raw).toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            val hash = digest.hash(address + ":" + quoted + ":" + raw)
             row.add(Cell(address,"CSV",address,"records","",col,if(empty) null else raw,if(empty) null else raw,
                 if(empty) "∅" else raw,if(empty) CellType.EMPTY else CellType.TEXT,hash))
             field.setLength(0); quoted = false; closed = false

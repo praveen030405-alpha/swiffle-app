@@ -7,10 +7,11 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import java.io.File
 import java.io.Writer
-import java.security.MessageDigest
+import com.swiffle.app.conversion.proof.core.ProvenanceDigest
 
 // Raw text-layer evidence. Logical row and header assignment requires a separate consensus gate.
 internal fun pdfRows(source: File): Sequence<List<Cell>> = sequence {
+    val digest = ProvenanceDigest()
     PDDocument.load(source,MemoryUsageSetting.setupTempFileOnly()).use { doc ->
         for (page in 1..doc.numberOfPages) {
             val cells = mutableListOf<Cell>()
@@ -19,8 +20,7 @@ internal fun pdfRows(source: File): Sequence<List<Cell>> = sequence {
                     val value = pos.unicode ?: error("Undecodable glyph on page " + page)
                     val box = listOf(pos.xDirAdj,pos.yDirAdj,pos.widthDirAdj,pos.heightDir).joinToString(",")
                     val id = "p" + page + "/" + cells.size
-                    val sha = MessageDigest.getInstance("SHA-256").digest((id + "/" + box + "/" + value).toByteArray())
-                        .joinToString("") { "%02x".format(it) }
+                    val sha = digest.hash(id + "/" + box + "/" + value)
                     cells += Cell(id,"page " + page,box,"text layer","","",value,value,value,CellType.TEXT,sha)
                 }
             }
