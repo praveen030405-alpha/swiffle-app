@@ -14,12 +14,15 @@ import kotlinx.serialization.json.Json
 enum class CellType { EMPTY, NOT_APPLICABLE, TEXT, DECIMAL, DATE, BOOLEAN, ERROR }
 
 @Serializable
+data class SourceToken(val id: String, val text: String, val bbox: String)
+
+@Serializable
 data class Cell(
     val id: String, val sourceRegion: String, val location: String,
     val section: String, val rowLabel: String, val columnKey: String,
     val valueRaw: String?, val valueTyped: String?, val displayText: String,
     val type: CellType, val provenanceHash: String, val formula: String? = null,
-    val cachedValue: String? = null
+    val cachedValue: String? = null, val tokens: List<SourceToken> = emptyList()
 ) {
     init {
         require(id.isNotBlank() && sourceRegion.isNotBlank() && location.isNotBlank())
