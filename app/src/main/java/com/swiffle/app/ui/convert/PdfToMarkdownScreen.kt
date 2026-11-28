@@ -325,6 +325,8 @@ fun PdfToMarkdownScreen(
                         .padding(bottom = 36.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    if (!isConverting) ConversionEvidenceCard()
+
                     // 1. Source PDF Picker / Inspector Card
                     PdfSourceCard(
                         doc = inspectedDoc,
