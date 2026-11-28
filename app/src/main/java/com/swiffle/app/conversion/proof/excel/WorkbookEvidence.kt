@@ -32,9 +32,10 @@ private class StringStore(dir: File) : java.io.Closeable {
     override fun close() { try { index.close() } finally { data.close() } }
 }
 
-internal fun workbookRows(source: File, scratch: File): Sequence<List<Cell>> = sequence {
+internal fun workbookRows(source: File, scratch: File,
+    newParser: () -> XmlPullParser = { Xml.newPullParser() }): Sequence<List<Cell>> = sequence {
     ZipFile(source).use { zip ->
-        fun parser(input: java.io.InputStream) = Xml.newPullParser().apply { setInput(input,null) }
+        fun parser(input: java.io.InputStream) = newParser().apply { setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES,true); setInput(input,null) }
         fun entry(path: String) = requireNotNull(zip.getEntry(path)) { "Missing workbook part: " + path }
         val rels = mutableMapOf<String,String>()
         zip.getInputStream(entry("xl/_rels/workbook.xml.rels")).use { input ->

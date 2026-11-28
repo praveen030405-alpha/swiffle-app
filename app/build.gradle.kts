@@ -138,6 +138,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     // Tests
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation("org.json:json:20240303")
